@@ -1,0 +1,22 @@
+[package]
+name = "nanogpt-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+burn = { version = "0.13.2", features = ["tui", "train", "metrics", "cuda", "autotune", "fusion", "wgpu", "accelerate"] }
+clap = "4.5.16"
+rayon = "1.10.0"
+serde = { version = "1.0.208", features = ["derive"] }
+tokenizers = "0.20.0"
+toml = "0.8.19"
+
+[profile.release]
+lto = true
+opt-level = 3
+overflow-checks = true
+debug = 0
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = 3
