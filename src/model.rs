@@ -1,5 +1,16 @@
-use burn::{module::Module, prelude::*, nn::attention};
+use burn::{nn::attention, prelude::*};
 use nn::{LayerNormConfig, LinearConfig};
+
+#[derive(Config, Debug)]
+pub struct ModelConfig {
+    n_head: usize,
+    n_embd: usize,
+    bias: bool,
+    dropout: f64,
+    vocab_size: usize,
+    n_layer: usize,
+    block_size: usize,
+}
 
 #[derive(Module, Debug)]
 pub struct SelfAttention<B: Backend> {
@@ -13,22 +24,19 @@ pub struct SelfAttention<B: Backend> {
 
 #[derive(Config, Debug)]
 pub struct SelfAttentionConfig {
-    n_head: usize,
-    n_embd: usize,
-    bias: bool,
-    dropout: f64,
+    config: ModelConfig
 }
 
 impl SelfAttentionConfig {
     pub fn init<B: Backend>(&self, device: &B::Device) -> SelfAttention<B> {
-        assert!(self.n_embd % self.n_head == 0);
+        assert!(self.config.n_embd % self.config.n_head == 0);
         SelfAttention {
-            c_attn: nn::LinearConfig::new(self.n_embd, self.n_embd * 3).with_bias(self.bias).init(device),
-            c_proj: nn::LinearConfig::new(self.n_embd, self.n_embd).with_bias(self.bias).init(device),
-            resid_dropout: nn::DropoutConfig::new(self.dropout).init(),
-            attn: attention::MultiHeadAttentionConfig::new(self.n_embd, self.n_head).with_dropout(self.dropout).init(device),
-            n_embd: self.n_embd,
-            n_head: self.n_head
+            c_attn: nn::LinearConfig::new(self.config.n_embd, self.config.n_embd * 3).with_bias(self.config.bias).init(device),
+            c_proj: nn::LinearConfig::new(self.config.n_embd, self.config.n_embd).with_bias(self.config.bias).init(device),
+            resid_dropout: nn::DropoutConfig::new(self.config.dropout).init(),
+            attn: attention::MultiHeadAttentionConfig::new(self.config.n_embd, self.config.n_head).with_dropout(self.config.dropout).init(device),
+            n_embd: self.config.n_embd,
+            n_head: self.config.n_head
         }
     }
 }
@@ -101,14 +109,15 @@ pub struct Block<B: Backend> {
 pub struct BlockConfig {
     attn_config: SelfAttentionConfig,
     mlp_config: MlpConfig,
+    config: ModelConfig
 }
 
 impl BlockConfig {
     pub fn init<B: Backend>(&self, device: &B::Device) -> Block<B> {
         Block {
-            ln_1: nn::LayerNormConfig::new(self.attn_config.n_embd).init(device),
+            ln_1: nn::LayerNormConfig::new(self.config.n_embd).init(device),
             attn: self.attn_config.init(device),
-            ln_2: LayerNormConfig::new(self.attn_config.n_embd).init(device),
+            ln_2: LayerNormConfig::new(self.config.n_embd).init(device),
             mlp: self.mlp_config.init(device)
         }
     }    
@@ -119,5 +128,66 @@ impl<B: Backend> Block<B> {
         let x = x.clone() + self.attn.forward(self.ln_1.forward(x));
         let x = x.clone() + self.mlp.forward(self.ln_2.forward(x));
         x
+    }
+}
+
+#[derive(Module, Debug)]
+pub struct Transformer<B: Backend> {
+    pub wte: nn::Embedding<B>,
+    pub wpe: nn::Embedding<B>,
+    pub drop: nn::Dropout,
+    pub h: Vec<Block<B>>,
+    pub ln_f: nn::LayerNorm<B>,
+}
+
+#[derive(Debug, Config)]
+pub struct TranformerConfig {
+    config: ModelConfig,
+    block_config: BlockConfig
+}
+
+impl TranformerConfig {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> Transformer<B> {
+        let mut blocks = Vec::new();
+        let (attn_config, mlp_config, model_config) = (self.block_config.attn_config.clone(), self.block_config.mlp_config.clone(), self.config.clone());
+        for i in [0..self.config.n_layer] {
+            blocks.push(BlockConfig::new(attn_config.clone(), mlp_config.clone(), self.config.clone()).init(device))
+        }
+        Transformer {
+            wte: nn::EmbeddingConfig::new(self.config.vocab_size, self.config.n_embd).init(device),
+            wpe: nn::EmbeddingConfig::new(self.config.block_size, self.config.n_embd).init(device),
+            drop: nn::DropoutConfig::new(self.config.dropout).init(),
+            h: blocks,
+            ln_f: LayerNormConfig::new(self.config.n_embd).init(device)
+        }
+    }
+}
+
+#[derive(Module, Debug)]
+pub struct GPT<B: Backend> {
+    transf: Transformer<B>,
+    lm_head: nn::Linear<B>,
+}
+
+
+#[derive(Config, Debug)]
+pub struct GPTConfig {
+    transf: TranformerConfig,
+    block_conf: BlockConfig,
+    config: ModelConfig
+}
+
+impl GPTConfig {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> GPT<B> {
+        let transf = self.transf.clone().init(device);
+        
+        println!("Number of parameters: {}", &transf.num_params());
+        GPT {
+           transf,
+           lm_head: LinearConfig::new(self.config.n_embd, self.config.vocab_size)
+               .with_bias(self.config.bias).init(device)
+        }
+        
+        
     }
 }
