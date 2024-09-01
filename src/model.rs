@@ -1,4 +1,5 @@
 use core::f64;
+use std::rc::Rc;
 
 use burn::{nn::attention, prelude::*, tensor::activation::softmax};
 use nn::{LayerNormConfig, LinearConfig};
@@ -140,8 +141,7 @@ impl BlockConfig {
 impl<B: Backend> Block<B> {
     pub fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let x = x.clone() + self.attn.forward(self.ln_1.forward(x));
-        let x = x.clone() + self.mlp.forward(self.ln_2.forward(x));
-        x
+        return x.clone() + self.mlp.forward(self.ln_2.forward(x));
     }
 }
 
@@ -239,19 +239,21 @@ impl<B: Backend> GPT<B> {
         temperature: Option<f64>,
         top_k: Option<usize>,) -> Tensor<B, 2, Int> {
         let mut idx_gen = idx.clone();
+        let idx = Rc::new(idx);
+        
+        let idx_cond = if idx.dims()[1] <= self.block_size {
+            idx.clone()
+        } else {
+            let start_idx = idx.dims()[1] - self.block_size;
+            let end_idx = idx.dims()[1];
+            Rc::new(Rc::unwrap_or_clone(idx.clone()).slice([0..idx.dims()[0], start_idx..end_idx]))
+        };
+        
         for _ in 0..max_new_tokens {
-            let idx_cond = if idx.dims()[1] <= self.block_size {
-                idx.clone()
-            } else {
-                let start_idx = idx.dims()[1] - self.block_size;
-                let end_idx = idx.dims()[1];
-                idx.clone().slice([0..idx.dims()[0], start_idx..end_idx])
-            };
-
             let temp = temperature.unwrap_or(1.0);
 
-            let logits = self.forward(idx_cond);
-            let logits = logits.clone().slice([
+            let logits = Rc::new(self.forward(Rc::unwrap_or_clone(idx_cond.clone())));
+            let logits = Rc::unwrap_or_clone(logits.clone()).slice([
                 0..logits.dims()[0],
                 (logits.dims()[1] - 1)..logits.dims()[1],
                 0..logits.dims()[2],
@@ -265,7 +267,7 @@ impl<B: Backend> GPT<B> {
 
             let probs = softmax(logits, 2);
             let idx_next = ops::multinominal_sample(probs.squeeze(0), 1);
-            idx_gen = Tensor::cat(vec![idx.clone(), idx_next.int().unsqueeze()], 1);
+            idx_gen = Tensor::cat(vec![Rc::try_unwrap(idx.clone()).unwrap(), idx_next.int().unsqueeze()], 1);
         }
         idx_gen
     }
