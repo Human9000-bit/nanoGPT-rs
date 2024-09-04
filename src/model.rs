@@ -1,20 +1,20 @@
 use core::f64;
-use std::rc::Rc;
+use std::{any::Any, rc::Rc, usize};
 
-use burn::{nn::attention, prelude::*, tensor::activation::softmax};
+use burn::{nn::attention, prelude::*, tensor::{activation::softmax, bf16}};
 use nn::{LayerNormConfig, LinearConfig};
 
 use crate::ops;
 
 #[derive(Config, Debug)]
 pub struct ModelConfig {
-    n_head: usize,
-    n_embd: usize,
-    bias: bool,
-    dropout: f64,
-    vocab_size: usize,
-    n_layer: usize,
-    block_size: usize,
+    pub n_head: usize,
+    pub n_embd: usize,
+    pub bias: bool,
+    pub dropout: f64,
+    pub n_layer: usize,
+    pub block_size: usize,
+    pub vocab_size: usize,
 }
 
 #[derive(Module, Debug)]
@@ -223,10 +223,10 @@ impl<B: Backend> GPT<B> {
 
         let tok_emb = self.transf.wte.forward(idx);
         let pos_emb = self.transf.wpe.forward(pos.unsqueeze());
-        let x = self.transf.drop.forward(tok_emb + pos_emb);
+        let mut x = self.transf.drop.forward(tok_emb + pos_emb);
 
         for block in &self.transf.h {
-            let x = block.forward(x.clone());
+            x = block.forward(x.clone());
         }
 
         let x = self.transf.ln_f.forward(x);
@@ -253,17 +253,21 @@ impl<B: Backend> GPT<B> {
             let temp = temperature.unwrap_or(1.0);
 
             let logits = Rc::new(self.forward(Rc::unwrap_or_clone(idx_cond.clone())));
-            let logits = Rc::unwrap_or_clone(logits.clone()).slice([
+            let /*mut*/ logits = Rc::unwrap_or_clone(logits.clone()).slice([
                 0..logits.dims()[0],
                 (logits.dims()[1] - 1)..logits.dims()[1],
                 0..logits.dims()[2],
-            ]);
+            ]).div_scalar(temp);
 
-            /* if top_k != None {
-                let v = logits.topk(top_k.unwrap(), 1);
-                let logits = logits.iter_dim(1);
-                logits
-            } */
+            /*if let Some(topk) = top_k {
+                let v = logits.clone().topk(topk.min(logits.shape().num_elements() - 1), logits.shape().num_elements() - 1);
+                let ranges = logits.lower(v.slice(
+                    [0..v.dims()[0], 
+                        0..logits.dims()[1]-1,
+                        0..logits.dims()[2]]));
+                logits = logits.slice_assign(ranges,
+                bf16::NEG_INFINITY)
+            }; */
 
             let probs = softmax(logits, 2);
             let idx_next = ops::multinominal_sample(probs.squeeze(0), 1);
