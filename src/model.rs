@@ -1,7 +1,7 @@
 use core::f64;
-use std::{any::Any, rc::Rc, usize};
+use std::rc::Rc;
 
-use burn::{nn::attention, prelude::*, tensor::{activation::softmax, bf16}};
+use burn::{nn::attention, prelude::*, tensor::activation::softmax};
 use nn::{LayerNormConfig, LinearConfig};
 
 use crate::ops;
@@ -54,18 +54,17 @@ impl SelfAttentionConfig {
 
 impl<B: Backend> SelfAttention<B> {
     fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
-        let shape = x.dims();
-        let (b, t, c) = (shape[0], shape[1], shape[2]);
+        // let shape = x.dims();
+        // let (b, t, c) = (shape[0], shape[1], shape[2]);
 
-        let temp = self.c_attn.forward(x).chunk(self.n_embd, 2);
-        let (q, k, v) = (temp[0].clone(), temp[1].clone(), temp[2].clone());
-        drop(temp);
+        let chunks = self.c_attn.forward(x).chunk(3, 2);
+        let (q, k, v) = (chunks[0].clone(), chunks[1].clone(), chunks[2].clone());
 
-        let k = k.reshape([b, t, c / self.n_head]).swap_dims(1, 2);
-        let q = q.reshape([b, t, c / self.n_head]).swap_dims(1, 2);
-        let v = v.reshape([b, t, c / self.n_head]).swap_dims(1, 2);
+        // let k = k.reshape([b, t, (c / self.n_head)]);
+        // let q = q.reshape([b, t, (c / self.n_head)]);
+        // let v = v.reshape([b, t, (c / self.n_head)]);
 
-        let mhainput = attention::MhaInput::new(q, k, v);
+        let mhainput = attention::MhaInput::new(q, k, v); 
 
         let y = self.attn.forward(mhainput);
         let y = y.context;
@@ -141,7 +140,7 @@ impl BlockConfig {
 impl<B: Backend> Block<B> {
     pub fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
         let x = x.clone() + self.attn.forward(self.ln_1.forward(x));
-        return x.clone() + self.mlp.forward(self.ln_2.forward(x));
+        x.clone() + self.mlp.forward(self.ln_2.forward(x))
     }
 }
 
@@ -168,7 +167,7 @@ impl TranformerConfig {
             self.block_config.mlp_config.clone(),
             self.config.clone(),
         );
-        for _ in [0..self.config.n_layer] {
+        for _ in [..self.config.n_layer] {
             blocks.push(
                 BlockConfig::new(attn_config.clone(), mlp_config.clone(), self.config.clone())
                     .init(device),
@@ -270,8 +269,8 @@ impl<B: Backend> GPT<B> {
             }; */
 
             let probs = softmax(logits, 2);
-            let idx_next = ops::multinominal_sample(probs.squeeze(0), 1);
-            idx_gen = Tensor::cat(vec![Rc::try_unwrap(idx.clone()).unwrap(), idx_next.int().unsqueeze()], 1);
+            let idx_next = ops::multinominal_sample(probs.flatten(0, 2), 1);
+            idx_gen = Tensor::cat(vec![Rc::unwrap_or_clone(idx.clone()), idx_next.int().unsqueeze()], 1);
         }
         idx_gen
     }
