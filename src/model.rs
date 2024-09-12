@@ -236,7 +236,7 @@ impl<B: Backend> GPT<B> {
         idx: Tensor<B, 2, Int>,
         max_new_tokens: usize,
         temperature: Option<f64>,
-        top_k: Option<usize>,) -> Tensor<B, 2, Int> {
+        /* top_k: Option<usize> */) -> Tensor<B, 2, Int> {
         let mut idx_gen = idx.clone();
         let idx = Rc::new(idx);
         

@@ -1,6 +1,7 @@
-use std::error::Error;
+use std::{error::Error, io};
 
-use burn::{backend::{self, Autodiff, Wgpu}, tensor::{Int, Tensor}};
+use burn::{backend::{self, Autodiff, Wgpu}, data::dataloader::batcher::Batcher, module::Module, tensor::{Int, Tensor}};
+use data::GptBatcher;
 use model::{BlockConfig, MlpConfig, SelfAttentionConfig};
 use tokenizers::Tokenizer;
 use rayon::prelude::*;
@@ -9,6 +10,7 @@ pub mod model;
 pub mod ops;
 pub mod data;
 pub mod config;
+pub mod train;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
@@ -19,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let device = backend::wgpu::WgpuDevice::BestAvailable;
     
-    let config = config::parse_config();
+    let config = config::parse_config(); //initialize model config from config.toml
     let modelconfig_toml = config["model"].as_table().unwrap();
     let modelconfig = model::ModelConfig::new(
         modelconfig_toml["n_head"].as_integer().unwrap() as usize,
@@ -38,13 +40,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let gpt: model::GPT<MyBackend> = model::GPTConfig::new(
         model::TranformerConfig::new(
             modelconfig.clone(), 
-            block_config.clone()), block_config, modelconfig).init(&device);
+            block_config.clone()), block_config, modelconfig).init(&device); //init gpt
     
-    let x = vocab.encode("helo", true).unwrap();
-    let x: Vec<i32> = x.get_ids().to_owned().par_iter().map(|x| x.to_owned() as i32).collect();
-    let x = Tensor::<MyBackend, 1, Int>::from_ints(x.as_slice(), &device);
-    let x = gpt.generate(x.unsqueeze(), 4, Some(1.0), None);
-    println!("{:?}", x);
+    let mut input = String::new();
+    println!("input the query: ");
+    io::stdin()
+        .read_line(&mut input)?;
+    
+    let batcher: GptBatcher<MyBackend> = GptBatcher::new(gpt.devices()[0].clone());
+    let batch = batcher.batch(vec![input]);
+    let y = gpt.forward(batch.text);
+    
+    println!("{:?}", y);
     
     Ok(())
 }

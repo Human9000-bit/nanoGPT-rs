@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use rand::thread_rng;
 use rand_distr::{num_traits::ToPrimitive, Distribution, WeightedIndex};
 
-pub fn multinominal_sample<B: Backend>(weights: Tensor<B, 1, Float>, num_samples: usize) -> Tensor<B, 1> {
+pub fn multinominal_sample<B: Backend>(weights: Tensor<B, 1>, num_samples: usize) -> Tensor<B, 1> {
     let device = weights.device();
     let weights_vec = tensor_to_vec(weights);
     let dist = WeightedIndex::new(&weights_vec).unwrap();
