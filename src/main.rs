@@ -1,10 +1,8 @@
-use std::{error::Error, io};
+use std::error::Error;
 
-use burn::{backend::{self, Autodiff, Wgpu}, data::dataloader::batcher::Batcher, module::Module, tensor::{Int, Tensor}};
-use data::GptBatcher;
+use burn::{backend::{self, Autodiff, Wgpu}, optim::AdamConfig};
 use model::{BlockConfig, MlpConfig, SelfAttentionConfig};
 use tokenizers::Tokenizer;
-use rayon::prelude::*;
 
 pub mod model;
 pub mod ops;
@@ -35,23 +33,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let block_config = BlockConfig::new(
                 SelfAttentionConfig::new(modelconfig.clone()),
-                MlpConfig::new(modelconfig.clone().n_embd, modelconfig.clone().dropout, modelconfig.clone().bias), modelconfig.clone());
+                MlpConfig::new(
+                    modelconfig.clone().n_embd, 
+                    modelconfig.clone().dropout, 
+                    modelconfig.clone().bias), 
+                modelconfig.clone()
+    );
     
-    let gpt: model::GPT<MyBackend> = model::GPTConfig::new(
+    let gpt = model::GPTConfig::new(
         model::TranformerConfig::new(
             modelconfig.clone(), 
-            block_config.clone()), block_config, modelconfig).init(&device); //init gpt
+            block_config.clone()), block_config, modelconfig);
+    println!("gpt config loaded");
     
-    let mut input = String::new();
-    println!("input the query: ");
-    io::stdin()
-        .read_line(&mut input)?;
-    
-    let batcher: GptBatcher<MyBackend> = GptBatcher::new(gpt.devices()[0].clone());
-    let batch = batcher.batch(vec![input]);
-    let y = gpt.forward(batch.text);
-    
-    println!("{:?}", y);
+    let artifact_dir = "model/";
+    let optim = AdamConfig::new();
+    let config = train::GPTtrainingConfig::new(gpt, optim);
+    crate::train::train::<AutoDiff>(artifact_dir, config, device);
     
     Ok(())
 }

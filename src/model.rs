@@ -204,7 +204,7 @@ impl GPTConfig {
         println!("Number of parameters: {}", &transf.num_params());
         GPT {
             transf,
-            lm_head: LinearConfig::new(self.config.n_embd, self.config.vocab_size)
+            lm_head: LinearConfig::new(self.config.n_embd, self.config.vocab_size * 6)
                 .with_bias(self.config.bias)
                 .init(device),
             block_size: self.config.block_size,
