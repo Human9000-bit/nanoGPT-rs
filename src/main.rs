@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
     let vocab_size = vocab.get_vocab_size(false);
     
-    type MyBackend = Wgpu<backend::wgpu::AutoGraphicsApi, f32, i32>;
+    type MyBackend = Wgpu<backend::wgpu::OpenGl, f32, i32>;
     type AutoDiff = Autodiff<MyBackend>;
     
     let device = backend::wgpu::WgpuDevice::BestAvailable;

@@ -201,7 +201,6 @@ impl GPTConfig {
     pub fn init<B: Backend>(&self, device: &B::Device) -> GPT<B> {
         let transf = self.transf.clone().init(device);
 
-        println!("Number of parameters: {}", &transf.num_params());
         GPT {
             transf,
             lm_head: LinearConfig::new(self.config.n_embd, self.config.vocab_size * 6)

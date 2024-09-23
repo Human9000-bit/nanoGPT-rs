@@ -15,10 +15,8 @@ impl<B: Backend> GPT<B> {
         &self,
         batch: GptBatch<B>) 
     -> RegressionOutput<B> {
-        let batch_targets_dims = batch.targets.dims();
         let batch_device = &batch.text.device();
         let output = self.forward(batch.text);
-        assert_eq!(output.dims()[0], batch_targets_dims[0]);
         let cel = CrossEntropyLossConfig::new()
             .init(batch_device);
         let loss = cel.forward(output.clone().flatten(1, 2), batch.targets.clone());
