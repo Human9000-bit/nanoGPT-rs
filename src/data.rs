@@ -28,7 +28,7 @@ impl<B: Backend> Batcher<String, GptBatch<B>> for GptBatcher<B>  {
             .map(|idx| {let mut idx = idx; idx.pad(12, 1, 2, "", PaddingDirection::Right); idx})
             .map(|idx_pad| idx_pad.get_ids().to_owned().par_iter().map(|&f| f as i32).collect())
             .map(|vec: Vec<i32>| Tensor::from_ints(vec.as_slice(), &self.device)).collect();
-        let tensor = Tensor::stack(batches, 0);
+        let tensor = Tensor::stack(batches, 1);
         let targets = tensor.clone().slice([0..tensor.dims()[0], tensor.dims()[1]/2..tensor.dims()[1]])
             .flatten(0, 1);
         let logits = tensor.clone().slice([0..tensor.dims()[0], 0..tensor.dims()[1]/2]);

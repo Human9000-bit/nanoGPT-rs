@@ -7,6 +7,7 @@ use burn::
     record::CompactRecorder, tensor::backend::AutodiffBackend, 
     train::{metric::LossMetric, LearnerBuilder, RegressionOutput, TrainOutput, TrainStep, ValidStep}
 };
+use log::info;
 
 use crate::{data::{GptBatch, GptBatcher}, model::{GPTConfig, GPT}};
 
@@ -50,7 +51,7 @@ pub struct GPTtrainingConfig {
     #[config(default = 64)]
     pub batch_size: usize,
     
-    #[config(dfault = 4)]
+    #[config(default = 4)]
     pub num_workers: usize,
     
     #[config(default = 792645020)]
@@ -72,9 +73,9 @@ pub fn train<B: AutodiffBackend>(artifacts_dir: &str, config: GPTtrainingConfig,
         .save(format!("{artifacts_dir}/config.json"))
         .expect("failed to create artifact dir");
     
-    B::seed(config.seed);
+    //B::seed(config.seed);
     
-    let loader = HuggingfaceDatasetLoader::new("fka/awesome-chatgpt-prompts");
+    let loader = HuggingfaceDatasetLoader::new("Open-Orca/OpenOrca");
     
     let train_batcher = GptBatcher::<B>::new(Rc::unwrap_or_clone(device.clone()));
     let train_valid = GptBatcher::<B::InnerBackend>::new(Rc::unwrap_or_clone(device.clone()));
@@ -85,9 +86,9 @@ pub fn train<B: AutodiffBackend>(artifacts_dir: &str, config: GPTtrainingConfig,
         .num_workers(config.num_workers)
         .build(loader.dataset("train").unwrap());
     
-    let loader = HuggingfaceDatasetLoader::new("fka/awesome-chatgpt-prompts");
+    let loader = HuggingfaceDatasetLoader::new("Open-Orca/OpenOrca");
     
-    println!("train datasel loaded");
+    info!("train datasel loaded");
     
     let test_dataloader = DataLoaderBuilder::new(train_valid)
         .batch_size(config.batch_size)
@@ -95,7 +96,7 @@ pub fn train<B: AutodiffBackend>(artifacts_dir: &str, config: GPTtrainingConfig,
         .num_workers(config.num_workers)
         .build(loader.dataset("train").unwrap());
     
-    println!("test dataset loaded");
+    info!("test dataset loaded");
     
     let device = Rc::unwrap_or_clone(device);
     
@@ -107,6 +108,8 @@ pub fn train<B: AutodiffBackend>(artifacts_dir: &str, config: GPTtrainingConfig,
         .num_epochs(config.num_epochs)
         .summary()
         .build(config.model.init::<B>(&device), config.optimizer.init(), config.learning_rate);
+    
+    info!("starting training...");
     
     let trained_model = learner.fit(train_dataloader, test_dataloader);
     

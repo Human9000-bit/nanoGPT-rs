@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-burn = { version = "0.13.2", features = ["tui", "train", "metrics", "autotune", "fusion", "wgpu", "cuda"] }
+burn = { version = "0.13.2", features = ["tui", "train", "metrics", "autotune", "fusion", "candle", "cuda"] }
 tokenizers = { version = "0.20.0", features = ["hf-hub", "http"] }
 clap = "4.5.16"
 rand = "0.8.5"
@@ -13,9 +13,9 @@ random = "0.14.0"
 rayon = "1.10.0"
 serde = { version = "1.0.208", features = ["derive"] }
 toml = "0.8.19"
+log = "0.4.22"
 
 [profile.dev]
-opt-level = 1
 panic = "unwind"
 incremental = true
 overflow-checks = true

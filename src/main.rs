@@ -1,50 +1,44 @@
 use std::error::Error;
 
-use burn::{backend::{self, Autodiff, Wgpu}, optim::AdamConfig};
+use burn::{backend::{self, Autodiff, Candle}, optim::AdamConfig, tensor::f16};
+use log::info;
 use model::{BlockConfig, MlpConfig, SelfAttentionConfig};
 use tokenizers::Tokenizer;
+use inits::init_model_config;
 
 pub mod model;
 pub mod ops;
 pub mod data;
 pub mod config;
 pub mod train;
+pub mod inits;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
     let vocab_size = vocab.get_vocab_size(false);
     
-    type MyBackend = Wgpu<backend::wgpu::OpenGl, f32, i32>;
+    type MyBackend = Candle<f16, u32>;
     type AutoDiff = Autodiff<MyBackend>;
     
-    let device = backend::wgpu::WgpuDevice::BestAvailable;
+    let device = backend::candle::CandleDevice::Cpu;
     
     let config = config::parse_config(); //initialize model config from config.toml
-    let modelconfig_toml = config["model"].as_table().unwrap();
-    let modelconfig = model::ModelConfig::new(
-        modelconfig_toml["n_head"].as_integer().unwrap() as usize,
-        modelconfig_toml["n_embd"].as_integer().unwrap() as usize,
-        modelconfig_toml["bias"].as_bool().unwrap(),
-        modelconfig_toml["dropout"].as_float().unwrap(),
-        modelconfig_toml["n_layer"].as_integer().unwrap() as usize,
-        modelconfig_toml["block_size"].as_integer().unwrap() as usize,
-        vocab_size
-    );
+    let model_config = init_model_config(config["model"].as_table().unwrap(), vocab_size);
     
     let block_config = BlockConfig::new(
-                SelfAttentionConfig::new(modelconfig.clone()),
+                SelfAttentionConfig::new(model_config.clone()),
                 MlpConfig::new(
-                    modelconfig.clone().n_embd, 
-                    modelconfig.clone().dropout, 
-                    modelconfig.clone().bias), 
-                modelconfig.clone()
+                    model_config.n_embd, 
+                    model_config.dropout, 
+                    model_config.bias), 
+                model_config.clone()
     );
     
     let gpt = model::GPTConfig::new(
         model::TranformerConfig::new(
-            modelconfig.clone(), 
-            block_config.clone()), block_config, modelconfig);
-    println!("gpt config loaded");
+            model_config.clone(), 
+            block_config.clone()), block_config, model_config.clone());
+    info!("gpt config loaded");
     
     let artifact_dir = "model/";
     let optim = AdamConfig::new();

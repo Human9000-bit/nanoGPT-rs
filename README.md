@@ -6,8 +6,13 @@ Currently there is no ready to use release, so just wait
 
 ## Roadmap
 Make model - done
+
 Training - wip
+
+Cli and Config.toml parsing - wip
+
 Inference
-Cli and Config.toml parsing
+
 Perfomance
+
 General code improvements

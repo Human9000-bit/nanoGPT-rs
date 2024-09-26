@@ -236,28 +236,30 @@ impl<B: Backend> GPT<B> {
         max_new_tokens: usize,
         temperature: Option<f64>,
         /* top_k: Option<usize> */) -> Tensor<B, 2, Int> {
+        let idx_dims = idx.dims();
         let mut idx_gen = idx.clone();
         let idx = Rc::new(idx);
         
         let idx_cond = if idx.dims()[1] <= self.block_size {
             idx.clone()
         } else {
-            let start_idx = idx.dims()[1] - self.block_size;
+            let start_idx = idx_dims[1] - self.block_size;
             let end_idx = idx.dims()[1];
-            Rc::new(Rc::unwrap_or_clone(idx.clone()).slice([0..idx.dims()[0], start_idx..end_idx]))
+            Rc::new(Rc::unwrap_or_clone(idx.clone()).slice([0..idx_dims[0], start_idx..end_idx]))
         };
         
         for _ in 0..max_new_tokens {
             let temp = temperature.unwrap_or(1.0);
 
             let logits = Rc::new(self.forward(Rc::unwrap_or_clone(idx_cond.clone())));
+            let logits_dims = logits.dims();
             let /*mut*/ logits = Rc::unwrap_or_clone(logits.clone()).slice([
-                0..logits.dims()[0],
-                (logits.dims()[1] - 1)..logits.dims()[1],
-                0..logits.dims()[2],
+                0..logits_dims[0],
+                (logits_dims[1] - 1)..logits_dims[2],
+                0..logits_dims[2],
             ]).div_scalar(temp);
 
-            /*if let Some(topk) = top_k {
+            /* if let Some(topk) = top_k {
                 let v = logits.clone().topk(topk.min(logits.shape().num_elements() - 1), logits.shape().num_elements() - 1);
                 let ranges = logits.lower(v.slice(
                     [0..v.dims()[0], 
