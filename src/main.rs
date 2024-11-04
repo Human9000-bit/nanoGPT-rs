@@ -1,49 +1,53 @@
-use std::error::Error;
 
-use burn::{backend::{self, Autodiff, Candle}, optim::AdamConfig, tensor::f16};
+use burn::{
+    backend::{self, Autodiff, Wgpu},
+    optim::AdamWConfig,
+};
+use data::DbPediaDataset;
+use inits::init_train_config;
 use log::info;
-use model::{BlockConfig, MlpConfig, SelfAttentionConfig};
 use tokenizers::Tokenizer;
-use inits::init_model_config;
+use train::train;
 
-pub mod model;
-pub mod ops;
-pub mod data;
 pub mod config;
-pub mod train;
+pub mod data;
 pub mod inits;
+pub mod model;
+pub mod train;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), anyhow::Error> {
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
     let vocab_size = vocab.get_vocab_size(false);
-    
-    type MyBackend = Candle<f16, u32>;
+    println!("{vocab_size}");
+
+    type MyBackend = Wgpu<f32, i32, backend::wgpu::WgslCompiler>;
     type AutoDiff = Autodiff<MyBackend>;
-    
-    let device = backend::candle::CandleDevice::Cpu;
-    
+
+    let device = backend::wgpu::WgpuDevice::BestAvailable;
+
     let config = config::parse_config(); //initialize model config from config.toml
-    let model_config = init_model_config(config["model"].as_table().unwrap(), vocab_size);
-    
-    let block_config = BlockConfig::new(
-                SelfAttentionConfig::new(model_config.clone()),
-                MlpConfig::new(
-                    model_config.n_embd, 
-                    model_config.dropout, 
-                    model_config.bias), 
-                model_config.clone()
-    );
-    
-    let gpt = model::GPTConfig::new(
-        model::TranformerConfig::new(
-            model_config.clone(), 
-            block_config.clone()), block_config, model_config.clone());
+
     info!("gpt config loaded");
-    
+
     let artifact_dir = "model/";
-    let optim = AdamConfig::new();
-    let config = train::GPTtrainingConfig::new(gpt, optim);
-    crate::train::train::<AutoDiff>(artifact_dir, config, device);
-    
+    let optimizer = AdamWConfig::new();
+
+    let dataset_train = DbPediaDataset::train();
+    let dataset_test = DbPediaDataset::test();
+
+    let gpt_config = inits::init_gpt_config(config["model"].as_table().unwrap(), vocab_size);
+
+    let train_config = init_train_config(config["train"].as_table().unwrap());
+
+    train::<AutoDiff, DbPediaDataset>(
+        device,
+        dataset_train,
+        dataset_test,
+        train_config,
+        artifact_dir,
+        gpt_config,
+        optimizer,
+    );
+
     Ok(())
 }

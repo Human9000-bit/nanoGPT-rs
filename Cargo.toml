@@ -4,7 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-burn = { version = "0.13.2", features = ["tui", "train", "metrics", "autotune", "fusion", "candle", "cuda"] }
+burn = { version = "0.15.0", features = [
+    "train",
+    "wgpu",
+    "accelerate",
+    "autotune",
+    "openblas-system",
+    "openblas",
+    "fusion",
+] }
 tokenizers = { version = "0.20.0", features = ["hf-hub", "http"] }
 clap = "4.5.16"
 rand = "0.8.5"
@@ -14,6 +22,8 @@ rayon = "1.10.0"
 serde = { version = "1.0.208", features = ["derive"] }
 toml = "0.8.19"
 log = "0.4.22"
+derive-new = "0.7.0"
+anyhow = "1.0.92"
 
 [profile.dev]
 panic = "unwind"

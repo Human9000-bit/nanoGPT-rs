@@ -1,119 +1,132 @@
-use std::rc::Rc;
-pub(crate) use std::fs;
+use std::{fs::File, io::Read, sync::Arc, thread, time::Duration};
 
-use burn::
-    {data::{dataloader::DataLoaderBuilder,dataset::HuggingfaceDatasetLoader},
-    module::Module,nn::loss::CrossEntropyLossConfig, optim::AdamConfig, prelude::*,
-    record::CompactRecorder, tensor::backend::AutodiffBackend, 
-    train::{metric::LossMetric, LearnerBuilder, RegressionOutput, TrainOutput, TrainStep, ValidStep}
+use crate::{
+    data::{GptBatcher, GptTokenizer, TextGenerationItem, Tokenizer, TrainGptBatch},
+    model::GptConfig,
 };
-use log::info;
-
-use crate::{data::{GptBatch, GptBatcher}, model::{GPTConfig, GPT}};
-
-impl<B: Backend> GPT<B> {
-    pub fn forward_regression(
-        &self,
-        batch: GptBatch<B>) 
-    -> RegressionOutput<B> {
-        let batch_device = &batch.text.device();
-        let output = self.forward(batch.text);
-        let cel = CrossEntropyLossConfig::new()
-            .init(batch_device);
-        let loss = cel.forward(output.clone().flatten(1, 2), batch.targets.clone());
-        
-        RegressionOutput::new(loss, output.flatten(0, 1), batch.targets.float().unsqueeze())
-    }
-}
-
-impl<B: AutodiffBackend> TrainStep<GptBatch<B>, RegressionOutput<B>> for GPT<B> {
-    fn step(&self, item: GptBatch<B>) -> burn::train::TrainOutput<RegressionOutput<B>> {
-        let item = self.forward_regression(item);
-        
-        TrainOutput::new(self, item.loss.backward(), item)
-    }
-}
-
-impl<B: Backend> ValidStep<GptBatch<B>, RegressionOutput<B>> for GPT<B> {
-    fn step(&self, item: GptBatch<B>) -> RegressionOutput<B> {
-        self.forward_regression(item)
-    }
-}
+use burn::{
+    data::{
+        dataloader::{DataLoader, DataLoaderBuilder},
+        dataset::{transform::SamplerDataset, Dataset},
+    },
+    lr_scheduler::noam::NoamLrSchedulerConfig,
+    optim::AdamWConfig,
+    prelude::*,
+    record::{
+        CompactRecorder, DefaultRecorder, HalfPrecisionSettings, NamedMpkBytesRecorder, Recorder
+    },
+    tensor::backend::AutodiffBackend,
+    train::{
+        metric::{AccuracyMetric, CudaMetric, LearningRateMetric, LossMetric},
+        LearnerBuilder,
+    },
+};
+use log::{info, warn};
 
 #[derive(Config)]
 pub struct GPTtrainingConfig {
-    pub model: GPTConfig,
-    pub optimizer: AdamConfig,
-    
-    #[config(default = 10)]
+    #[config(default = 1)]
     pub num_epochs: usize,
-    
-    #[config(default = 64)]
+
+    #[config(default = 6)]
     pub batch_size: usize,
-    
-    #[config(default = 4)]
+
+    #[config(default = 32)]
+    pub target_batch_size: usize,
+
+    #[config(default = 10)]
     pub num_workers: usize,
-    
+
     #[config(default = 792645020)]
     pub seed: u64,
-    
+
     #[config(deafult = 1.0e-4)]
-    pub learning_rate: f64
+    pub learning_rate: f64,
+
+    #[config(default = 0.001)]
+    pub weight_decay: f64,
+
+    #[config(default = 4000)]
+    pub warmup_steps: usize,
 }
 
-pub fn create_artifact_dir(dir: &str) {
-    fs::remove_dir_all(dir).ok();
-    fs::create_dir_all(dir).ok();
-}
+pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
+    device: B::Device,
+    dataset_train: D,
+    dataset_test: D,
+    config: GPTtrainingConfig,
+    artifact_dir: &str,
+    gpt_config: GptConfig,
+    optimizer: AdamWConfig,
+) {
+    let tokenizer = Arc::new(GptTokenizer::default());
+    let batcher_train = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
+    let batcher_test = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
 
-pub fn train<B: AutodiffBackend>(artifacts_dir: &str, config: GPTtrainingConfig, device: B::Device) {
-    let device = Rc::new(device);
-    create_artifact_dir(artifacts_dir);
-    config
-        .save(format!("{artifacts_dir}/config.json"))
-        .expect("failed to create artifact dir");
+    B::seed(config.seed);
+
+    let mut buf = Vec::new();
+    let _ = File::open("model/gpt.mpk").unwrap().read_to_end(&mut buf);
     
-    //B::seed(config.seed);
-    
-    let loader = HuggingfaceDatasetLoader::new("Open-Orca/OpenOrca");
-    
-    let train_batcher = GptBatcher::<B>::new(Rc::unwrap_or_clone(device.clone()));
-    let train_valid = GptBatcher::<B::InnerBackend>::new(Rc::unwrap_or_clone(device.clone()));
-    
-    let train_dataloader = DataLoaderBuilder::new(train_batcher)
+    let record =
+        NamedMpkBytesRecorder::<HalfPrecisionSettings>::new().load(buf, &device);
+
+    let model = match record {
+        Ok(record) => {
+            println!("model weights loaded");
+            gpt_config.init::<B>(&device).load_record(record)
+        }
+        Err(_) => gpt_config.init::<B>(&device),
+    };
+
+    let save_res = config.save(format!("{artifact_dir}/config.json"));
+    match save_res {
+        Ok(()) => info!("model config saved"),
+        Err(e) => warn!("failed to save model config; {e}"),
+    }
+
+    let dataloader_train: Arc<dyn DataLoader<TrainGptBatch<B>>> =
+        DataLoaderBuilder::new(batcher_train)
+            .batch_size(config.batch_size)
+            .num_workers(config.num_workers)
+            .shuffle(config.seed)
+            .build(SamplerDataset::new(dataset_train, 10_000));
+
+    let dataloader_test = DataLoaderBuilder::new(batcher_test)
         .batch_size(config.batch_size)
-        .shuffle(config.seed)
         .num_workers(config.num_workers)
-        .build(loader.dataset("train").unwrap());
-    
-    let loader = HuggingfaceDatasetLoader::new("Open-Orca/OpenOrca");
-    
-    info!("train datasel loaded");
-    
-    let test_dataloader = DataLoaderBuilder::new(train_valid)
-        .batch_size(config.batch_size)
         .shuffle(config.seed)
-        .num_workers(config.num_workers)
-        .build(loader.dataset("train").unwrap());
-    
-    info!("test dataset loaded");
-    
-    let device = Rc::unwrap_or_clone(device);
-    
-    let learner = LearnerBuilder::new(artifacts_dir)
+        .build(SamplerDataset::new(dataset_test, 1000));
+
+    let accum = config.target_batch_size / config.batch_size;
+    let optim = optimizer
+        .with_weight_decay(config.weight_decay as f32)
+        .init();
+    let lr_sched = NoamLrSchedulerConfig::new(config.learning_rate / accum as f64)
+        .with_warmup_steps(config.warmup_steps)
+        .with_model_size(gpt_config.transformer.d_model)
+        .init();
+
+    let learner = LearnerBuilder::new(artifact_dir)
+        .metric_train(CudaMetric::new())
+        .metric_valid(CudaMetric::new())
+        .metric_train_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
+        .metric_valid_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_train_numeric(LossMetric::new())
         .metric_valid_numeric(LossMetric::new())
+        .metric_train_numeric(LearningRateMetric::new())
         .with_file_checkpointer(CompactRecorder::new())
-        .devices(vec![device.clone()])
+        .devices(vec![device])
+        .grads_accumulation(accum)
         .num_epochs(config.num_epochs)
         .summary()
-        .build(config.model.init::<B>(&device), config.optimizer.init(), config.learning_rate);
-    
-    info!("starting training...");
-    
-    let trained_model = learner.fit(train_dataloader, test_dataloader);
-    
-    trained_model
-        .save_file(format!("{artifacts_dir}/model"), &CompactRecorder::new())
-        .expect("failed to save the model");
+        .build(model, optim, lr_sched);
+
+    thread::sleep(Duration::from_secs(5));
+
+    let model = learner.fit(dataloader_train, dataloader_test);
+
+    let _ = model
+        .save_file("model/gpt", &DefaultRecorder::new())
+        .inspect_err(|e| log::error!("failed to save the model: {e}"));
 }
