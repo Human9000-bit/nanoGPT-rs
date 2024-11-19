@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 
 use burn::{
     backend::{self, Autodiff, Wgpu},

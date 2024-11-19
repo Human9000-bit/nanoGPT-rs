@@ -13,11 +13,11 @@ use burn::{
     optim::AdamWConfig,
     prelude::*,
     record::{
-        CompactRecorder, DefaultRecorder, HalfPrecisionSettings, NamedMpkBytesRecorder, Recorder
+        CompactRecorder, DefaultRecorder, HalfPrecisionSettings, NamedMpkBytesRecorder, Recorder,
     },
     tensor::backend::AutodiffBackend,
     train::{
-        metric::{AccuracyMetric, CudaMetric, LearningRateMetric, LossMetric},
+        metric::{AccuracyMetric, CpuMemory, CpuTemperature, CpuUse, CudaMetric, LearningRateMetric, LossMetric},
         LearnerBuilder,
     },
 };
@@ -64,16 +64,15 @@ pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
     let batcher_test = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
 
     B::seed(config.seed);
-
-    let mut buf = Vec::new();
-    let _ = File::open("model/gpt.mpk").unwrap().read_to_end(&mut buf);
     
-    let record =
-        NamedMpkBytesRecorder::<HalfPrecisionSettings>::new().load(buf, &device);
+    let mut buf = Vec::new();
+    let _ = File::open("model/gpt.mpk").unwrap().read_to_end(&mut buf); 
+
+    let record = NamedMpkBytesRecorder::<HalfPrecisionSettings>::new().load(buf, &device);
 
     let model = match record {
         Ok(record) => {
-            println!("model weights loaded");
+            info!("model weights loaded");
             gpt_config.init::<B>(&device).load_record(record)
         }
         Err(_) => gpt_config.init::<B>(&device),
@@ -110,6 +109,9 @@ pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
     let learner = LearnerBuilder::new(artifact_dir)
         .metric_train(CudaMetric::new())
         .metric_valid(CudaMetric::new())
+        .metric_train(CpuUse::new())
+        .metric_train(CpuMemory::new())
+        .metric_train(CpuTemperature::new())
         .metric_train_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_valid_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_train_numeric(LossMetric::new())

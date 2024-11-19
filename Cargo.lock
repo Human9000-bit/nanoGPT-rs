@@ -2571,6 +2571,7 @@ dependencies = [
  "random",
  "rayon",
  "serde",
+ "serde_json",
  "tokenizers",
  "toml",
 ]

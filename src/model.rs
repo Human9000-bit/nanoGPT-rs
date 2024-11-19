@@ -62,6 +62,7 @@ impl GptConfig {
 }
 
 impl<B: Backend> Gpt<B> {
+    #[inline]
     pub fn forward(&self, batch: GptBatch<B>) -> Tensor<B, 2, Float> {
         let [batch_size, seq_len] = batch.tokens.dims();
         let device = &batch.tokens.device();
@@ -88,6 +89,7 @@ impl<B: Backend> Gpt<B> {
         output.reshape([batch_size * seq_len, self.vocab_size])
     }
 
+    #[inline]
     pub fn forward_class(&self, item: TrainGptBatch<B>) -> ClassificationOutput<B> {
         let [batch_size, seq_len] = item.tokens_input.dims();
 
