@@ -50,10 +50,10 @@ pub struct GPTtrainingConfig {
     pub warmup_steps: usize,
 }
 
-pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
+pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static, DV: Dataset<TextGenerationItem> + 'static>(
     device: B::Device,
     dataset_train: D,
-    dataset_test: D,
+    dataset_test: DV,
     config: GPTtrainingConfig,
     artifact_dir: &str,
     gpt_config: GptConfig,

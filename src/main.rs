@@ -4,7 +4,7 @@ use burn::{
     backend::{self, Autodiff, Wgpu},
     optim::AdamWConfig,
 };
-use data::DbPediaDataset;
+use data::{DbPediaDataset, DvachDataset};
 use inits::init_train_config;
 use log::info;
 use tokenizers::Tokenizer;
@@ -33,14 +33,14 @@ fn main() -> Result<(), anyhow::Error> {
     let artifact_dir = "model/";
     let optimizer = AdamWConfig::new();
 
-    let dataset_train = DbPediaDataset::train();
+    let dataset_train = DvachDataset::train();
     let dataset_test = DbPediaDataset::test();
 
     let gpt_config = inits::init_gpt_config(config["model"].as_table().unwrap(), vocab_size);
 
     let train_config = init_train_config(config["train"].as_table().unwrap());
 
-    train::<AutoDiff, DbPediaDataset>(
+    train::<AutoDiff, DvachDataset, DbPediaDataset>(
         device,
         dataset_train,
         dataset_test,
