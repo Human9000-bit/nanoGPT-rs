@@ -4,7 +4,7 @@ use burn::{
     backend::{self, Autodiff, Wgpu},
     optim::AdamWConfig,
 };
-use data::{DbPediaDataset, DvachDataset};
+use data::DbPediaDataset;
 use inits::init_train_config;
 use log::info;
 use tokenizers::Tokenizer;
@@ -39,7 +39,7 @@ fn main() -> Result<(), anyhow::Error> {
     let optimizer = AdamWConfig::new();
 
     // initialize datasets
-    let dataset_train = DvachDataset::train();
+    let dataset_train = DbPediaDataset::train();
     let dataset_test = DbPediaDataset::test();
 
     // configs initialization
@@ -48,7 +48,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // train the model
     // TODO: add choice between train and inference modes
-    train::<AutoDiff, DvachDataset, DbPediaDataset>(
+    train::<AutoDiff, DbPediaDataset, DbPediaDataset>(
         device,
         dataset_train,
         dataset_test,
