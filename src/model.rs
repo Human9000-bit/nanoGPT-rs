@@ -15,11 +15,17 @@ use crate::data::{GptBatch, TrainGptBatch};
 
 #[derive(Config)]
 pub struct GptConfig {
+    /// Transformer encoder config
     pub transformer: TransformerEncoderConfig,
+    /// Vocabulary size from tokenizer
     pub vocab_size: usize,
+    /// Padding token from tokenizer
     pub pad_token: usize,
+    /// Maximum sequence length
     pub max_seq_len: usize,
+    /// Dropout vaalue
     dropout: f64,
+    /// Whether to use bias or not
     bias: bool,
 }
 
@@ -28,7 +34,7 @@ pub struct Gpt<B: Backend> {
     transformer: TransformerEncoder<B>,
     embd_token: Embedding<B>,
     embd_pos: Embedding<B>,
-    output: Linear<B>,
+    linear: Linear<B>,
     vocab_size: usize,
     pad_token: usize,
     max_seq_len: usize,
@@ -53,7 +59,7 @@ impl GptConfig {
             transformer,
             embd_token,
             embd_pos,
-            output,
+            linear: output,
             vocab_size: self.vocab_size,
             pad_token: self.pad_token,
             max_seq_len: self.max_seq_len,
@@ -63,10 +69,12 @@ impl GptConfig {
 
 impl<B: Backend> Gpt<B> {
     #[inline]
+    /// Forward pass of the model
     pub fn forward(&self, batch: GptBatch<B>) -> Tensor<B, 2, Float> {
         let [batch_size, seq_len] = batch.tokens.dims();
         let device = &batch.tokens.device();
 
+        // move data to device
         let inputs = batch.tokens.to_device(device);
         let mask = batch.mask_pad.to_device(device);
 
@@ -74,29 +82,37 @@ impl<B: Backend> Gpt<B> {
             .reshape([1, seq_len])
             .repeat_dim(0, batch_size);
 
+        // generate positional and token embeddings
         let embd_pos = self.embd_pos.forward(idx_pos);
         let embd_toks = self.embd_token.forward(inputs);
         let embedding = (embd_pos + embd_toks) / 2;
 
         let mask_attn = generate_autoregressive_mask::<B>(batch_size, seq_len, device);
+
+        // the forward pass of the transformer
         let encoded = self.transformer.forward(
             TransformerEncoderInput::new(embedding)
                 .mask_pad(mask)
                 .mask_attn(mask_attn),
         );
 
-        let output = self.output.forward(encoded);
+        // pass the output through the linear layer
+        let output = self.linear.forward(encoded);
+
         output.reshape([batch_size * seq_len, self.vocab_size])
     }
 
     #[inline]
+    /// Forward pass of the model for classification
     pub fn forward_class(&self, item: TrainGptBatch<B>) -> ClassificationOutput<B> {
         let [batch_size, seq_len] = item.tokens_input.dims();
 
+        // model forward pass
         let batch = GptBatch::new(item.tokens_input, item.mask_pad);
         let outputs = self.forward(batch);
         let targets_flat = item.targets.reshape([batch_size * seq_len]);
 
+        // Calculate cross entropy loss
         let loss = CrossEntropyLossConfig::new()
             .with_pad_tokens(Some(vec![self.pad_token]))
             .init(&outputs.device());

@@ -1,3 +1,6 @@
+# GPT-2 model config
+# changing these values will require re training the model
+# because new weights will be initialized
 [model]
 n_head = 12
 n_embd = 768
@@ -7,6 +10,7 @@ dropout = 0.0
 n_layer = 12
 max_seq_len = 50
 
+# training config, changing these values will adjust the training process
 [train]
 seed = 8723642934
 num_epochs = 1

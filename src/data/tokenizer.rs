@@ -42,11 +42,11 @@ impl Tokenizer for GptTokenizer {
         };
 
         let tokens = self.tokenizer.encode(text, true).unwrap();
-        tokens.get_ids().par_iter().map(|t| *t as usize).collect()
+        tokens.get_ids().into_par_iter().map(|t| *t as usize).collect()
     }
 
     fn decode(&self, tokens: &[usize]) -> String {
-        let tokens = tokens.par_iter().map(|t| *t as u32).collect::<Vec<u32>>();
+        let tokens = tokens.into_par_iter().map(|t| *t as u32).collect::<Vec<u32>>();
         self.tokenizer.decode(&tokens, false).unwrap()
     }
 
@@ -77,7 +77,7 @@ mod tests {
     fn test_encode_decode() {
         let tokenizer = GptTokenizer::default();
         let mut thread_rng = rand::thread_rng();
-        let mut sequence = vec![0u8; thread_rng.gen_range(0..1488)];
+        let mut sequence = vec![0u8; thread_rng.gen_range(0..10000)];
         thread_rng.fill_bytes(&mut sequence);
         let text: String = sequence.par_iter().map(|i| *i as char).collect();
 
