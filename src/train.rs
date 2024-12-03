@@ -21,7 +21,7 @@ use burn::{
     },
 };
 use log::{info, warn};
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 #[derive(Config)]
 pub struct GPTtrainingConfig {
@@ -61,10 +61,11 @@ pub fn train<
     dataset_train: D,
     dataset_test: DV,
     config: GPTtrainingConfig,
-    artifact_dir: &str,
+    artifact_dir: PathBuf,
     gpt_config: GptConfig,
     optimizer: AdamWConfig,
 ) {
+    let artifact_dir = artifact_dir.as_path();
     let tokenizer = Arc::new(GptTokenizer::default());
     let batcher_train = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
     let batcher_test = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
@@ -78,7 +79,7 @@ pub fn train<
         .unwrap_or_else(|_| gpt_config.init::<B>(&device));
 
     // Save model config
-    let save_res = config.save(format!("{artifact_dir}/config.json"));
+    let save_res = config.save(artifact_dir.join("config.json"));
     match save_res {
         Ok(()) => info!("model config saved"),
         Err(e) => warn!("failed to save model config; {e}"),
@@ -141,6 +142,6 @@ pub fn train<
 
     // save the model
     let _ = model
-        .save_file("model/gpt", &DefaultRecorder::new())
+        .save_file(artifact_dir.join("gpt"), &DefaultRecorder::new())
         .inspect_err(|e| log::error!("failed to save the model: {e}"));
 }

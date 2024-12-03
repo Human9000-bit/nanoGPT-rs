@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use std::path::Path;
+
 use burn::{
     backend::{self, Autodiff, Wgpu},
     optim::AdamWConfig,
@@ -13,10 +15,10 @@ use train::train;
 pub mod args;
 pub mod config;
 pub mod data;
+pub mod inference;
 pub mod inits;
 pub mod model;
 pub mod train;
-pub mod inference;
 
 fn main() -> Result<(), anyhow::Error> {
     // load tokenizer and get vocabulary size
@@ -35,7 +37,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     info!("gpt config loaded");
 
-    let artifact_dir = "model/";
+    let artifact_dir = Path::new("model/");
     let optimizer = AdamWConfig::new();
 
     // initialize datasets
@@ -53,7 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
         dataset_train,
         dataset_test,
         train_config,
-        artifact_dir,
+        artifact_dir.to_path_buf(),
         gpt_config,
         optimizer,
     );
