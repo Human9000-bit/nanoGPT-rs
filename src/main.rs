@@ -63,10 +63,13 @@ fn main() -> Result<(), anyhow::Error> {
                 optimizer,
             );
         }
-        &_ => {crate::inference::infer::<MyBackend>(gpt_config, device, Some("primitive".into()), artifact_dir.to_path_buf())}
+        &_ => crate::inference::infer::<MyBackend>(
+            gpt_config,
+            device,
+            Some("primitive".into()),
+            artifact_dir.to_path_buf(),
+        ),
     }
-
-    
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use crate::{
 use burn::{
     data::{
         dataloader::{DataLoader, DataLoaderBuilder},
-        dataset::{transform::SamplerDataset, Dataset},
+        dataset::Dataset,
     },
     lr_scheduler::noam::NoamLrSchedulerConfig,
     optim::AdamWConfig,
@@ -92,14 +92,14 @@ pub fn train<
             .batch_size(config.batch_size)
             .num_workers(config.num_workers)
             .shuffle(config.seed)
-            .build(SamplerDataset::new(dataset_train, 10_000));
+            .build(dataset_train);
 
     // test
     let dataloader_test = DataLoaderBuilder::new(batcher_test)
         .batch_size(config.batch_size)
         .num_workers(config.num_workers)
         .shuffle(config.seed)
-        .build(SamplerDataset::new(dataset_test, 1000));
+        .build(dataset_test);
 
     // gradient accumulation
     let accum = config.target_batch_size / config.batch_size;

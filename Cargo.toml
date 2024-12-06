@@ -12,6 +12,7 @@ burn = { version = "0.15.0", features = [
     "openblas-system",
     "openblas",
     "fusion",
+    "sqlite",
 ] }
 tokenizers = { version = "0.20.0", features = ["hf-hub", "http"] }
 rand = "0.8.5"
