@@ -5,7 +5,7 @@ use crate::{
 use burn::{
     data::{
         dataloader::{DataLoader, DataLoaderBuilder},
-        dataset::Dataset,
+        dataset::{transform::SamplerDataset, Dataset},
     },
     lr_scheduler::noam::NoamLrSchedulerConfig,
     optim::AdamWConfig,
@@ -49,6 +49,9 @@ pub struct GPTtrainingConfig {
     /// Number of warmup steps (linearly increases learning rate from 0 to lr)
     #[config(default = 4000)]
     pub warmup_steps: usize,
+    /// Numbers of elements from the dataset processed per epoch
+    #[config(default = 10000)]
+    pub elements_per_epoch: usize,
 }
 
 /// Trains the model
@@ -92,14 +95,14 @@ pub fn train<
             .batch_size(config.batch_size)
             .num_workers(config.num_workers)
             .shuffle(config.seed)
-            .build(dataset_train);
+            .build(SamplerDataset::new(dataset_train, config.elements_per_epoch));
 
     // test
     let dataloader_test = DataLoaderBuilder::new(batcher_test)
         .batch_size(config.batch_size)
         .num_workers(config.num_workers)
         .shuffle(config.seed)
-        .build(dataset_test);
+        .build(SamplerDataset::new(dataset_test, config.elements_per_epoch));
 
     // gradient accumulation
     let accum = config.target_batch_size / config.batch_size;

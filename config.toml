@@ -20,3 +20,4 @@ num_workers = 6
 learning_rate = 0.0005
 weight_decay = 0.01
 warmup_steps = 350
+elements_per_epoch = 10000
