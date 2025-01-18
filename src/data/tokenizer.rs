@@ -96,23 +96,18 @@ impl Tokenizer for GptTokenizer {
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, RngCore};
-
     use super::*;
+    use quickcheck::quickcheck;
 
-    /// Test that random string is the same as encoded and decoded back
-    // TODO: move to quickcheck crate
-    #[test]
-    fn test_encode_decode() {
-        let tokenizer = GptTokenizer::default();
-        let mut thread_rng = rand::thread_rng();
-        let mut sequence = vec![0u8; thread_rng.gen_range(0..10000)];
-        thread_rng.fill_bytes(&mut sequence);
-        let text: String = sequence.par_iter().map(|i| *i as char).collect();
+    quickcheck! {
+        /// Test that random string is the same as encoded and decoded back
+        fn test_encode_decode(text: String) -> bool {
+            let tokenizer = GptTokenizer::default();
 
-        let encoded = tokenizer.encode(text.as_str(), false);
-        let decoded = tokenizer.decode(encoded.as_slice());
+            let encoded = tokenizer.encode(text.as_str(), false);
+            let decoded = tokenizer.decode(encoded.as_slice());
 
-        assert_eq!(text, decoded)
+            text == decoded
+        }
     }
 }

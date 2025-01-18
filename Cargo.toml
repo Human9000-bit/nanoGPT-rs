@@ -26,6 +26,9 @@ derive-new = "0.7.0"
 anyhow = "1.0.92"
 serde_json = "1.0.132"
 
+[dev-dependencies]
+quickcheck = "1.0.3"
+
 [profile.dev]
 panic = "unwind"
 incremental = true
