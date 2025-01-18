@@ -30,7 +30,7 @@ fn main() -> Result<(), anyhow::Error> {
     type MyBackend = Wgpu<f32, i32, backend::wgpu::WgslCompiler>;
 
     // device initialization
-    let device = backend::wgpu::WgpuDevice::BestAvailable;
+    let device = backend::wgpu::WgpuDevice::DefaultDevice;
 
     let config = config::parse_config(); //initialize model config from config.toml
 
