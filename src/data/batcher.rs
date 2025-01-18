@@ -10,23 +10,30 @@ use super::{TextGenerationItem, Tokenizer};
 #[derive(Clone, new)]
 /// Batcher for the GPT model
 pub struct GptBatcher {
+    /// Batcher 's pointer to tokenizer
     tokenizer: Arc<dyn Tokenizer>,
+    /// Maximal sequence length of batch text
     max_seq_len: usize,
 }
 
 #[derive(Debug, Clone, new)]
 /// Evaluation batch for the GPT model
 pub struct GptBatch<B: Backend> {
+    /// Tokenized text of the batch
     pub tokens: Tensor<B, 2, Int>,
+    /// Padding mask of that text
     pub mask_pad: Tensor<B, 2, Bool>,
 }
 
 #[derive(Debug, Clone, new)]
 /// Training batch for the GPT model with targets
 pub struct TrainGptBatch<B: Backend> {
+    /// Input tokens passed to model
     pub tokens_input: Tensor<B, 2, Int>,
-    pub targets: Tensor<B, 2, Int>,
+    /// Padding mask for input tokens
     pub mask_pad: Tensor<B, 2, Bool>,
+    /// Targets aka labels
+    pub targets: Tensor<B, 2, Int>,
 }
 
 impl<B: Backend> Batcher<TextGenerationItem, GptBatch<B>> for GptBatcher {
@@ -63,6 +70,6 @@ impl<B: Backend> Batcher<TextGenerationItem, TrainGptBatch<B>> for GptBatcher {
         let targets = item.tokens.slice([0..batch_size, 1..seq_length]);
         let mask_pad = item.mask_pad.slice([0..batch_size, 0..seq_length - 1]);
 
-        TrainGptBatch::new(inputs, targets, mask_pad)
+        TrainGptBatch::new(inputs, mask_pad, targets)
     }
 }

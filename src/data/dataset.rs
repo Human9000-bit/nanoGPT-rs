@@ -2,20 +2,25 @@ use burn::data::dataset::{Dataset, HuggingfaceDatasetLoader, SqliteDataset};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
+/// String that is passed to the model
 #[derive(new, Clone, Debug)]
 pub struct TextGenerationItem {
+    /// The string that is passed to the model
     pub text: String,
 }
 
+/// A single item from [DbPediaDataset]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DbPediaItem {
+    /// The content of the item
     pub content: String,
 }
 
-/// The dbppedia_14 dataset
+/// The dbpedia_14 dataset
 ///
 /// https://huggingface.co/datasets/dbpedia_14
 pub struct DbPediaDataset {
+    /// Dataset of [DbPediaItem]s converted into [SqliteDataset]
     dataset: SqliteDataset<DbPediaItem>,
 }
 
@@ -51,8 +56,10 @@ impl DbPediaDataset {
     }
 }
 
+/// A single item of [DvachDataset]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DvachItem {
+    /// Conversation in the vec of strings for each message
     pub conversation: Vec<String>,
 }
 
@@ -60,6 +67,7 @@ pub struct DvachItem {
 ///
 /// https://huggingface.co/datasets/Vikhrmodels/2ch-24-09-2024-no-links
 pub struct DvachDataset {
+    /// Dataset of [DvachItem]s converted into [SqliteDataset]
     pub dataset: SqliteDataset<DvachItem>,
 }
 

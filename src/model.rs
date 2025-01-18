@@ -14,6 +14,7 @@ use nn::{
 use crate::data::{GptBatch, TrainGptBatch};
 
 #[derive(Config)]
+/// Gpt configuration struct
 pub struct GptConfig {
     /// Transformer encoder config
     pub transformer: TransformerEncoderConfig,
@@ -23,35 +24,53 @@ pub struct GptConfig {
     pub pad_token: usize,
     /// Maximum sequence length
     pub max_seq_len: usize,
-    /// Dropout vaalue
+    /// Dropout value
     dropout: f64,
     /// Whether to use bias or not
     bias: bool,
 }
 
+/// The GPT-2 - like model
 #[derive(Module, Debug)]
 pub struct Gpt<B: Backend> {
+    /// Model transformer
     transformer: TransformerEncoder<B>,
+    /// Embedding token encoding
     embd_token: Embedding<B>,
+    /// Embedding positional encoding
     embd_pos: Embedding<B>,
+    /// Linear layer after transformer pass
     linear: Linear<B>,
+    /// Model vocabulary size
+    ///
+    /// You will probably want to use tokenizer 's vocabulary size for it
     vocab_size: usize,
+    /// Index of the padding token
     pad_token: usize,
+    /// Max text length model will be able to generate
     max_seq_len: usize,
 }
 
 impl GptConfig {
+    /// Initialize the actual model from its config
     pub fn init<B: Backend>(&self, device: &B::Device) -> Gpt<B> {
+        // initialize linear layer
         let output = LinearConfig::new(self.transformer.d_model, self.vocab_size)
             .with_bias(self.bias)
             .init(device);
+
+        // initialize transformer
         let transformer = self
             .transformer
             .clone()
             .with_dropout(self.dropout)
             .init(device);
+
+        // Initialize token embedding...
         let embd_token =
             EmbeddingConfig::new(self.vocab_size, self.transformer.d_model).init(device);
+
+        // ... and positional embedding
         let embd_pos =
             EmbeddingConfig::new(self.max_seq_len, self.transformer.d_model).init(device);
 
@@ -84,8 +103,8 @@ impl<B: Backend> Gpt<B> {
 
         // generate positional and token embeddings
         let embd_pos = self.embd_pos.forward(idx_pos);
-        let embd_toks = self.embd_token.forward(inputs);
-        let embedding = (embd_pos + embd_toks) / 2;
+        let embd_tokens = self.embd_token.forward(inputs);
+        let embedding = (embd_pos + embd_tokens) / 2;
 
         let mask_attn = generate_autoregressive_mask::<B>(batch_size, seq_len, device);
 
@@ -104,6 +123,8 @@ impl<B: Backend> Gpt<B> {
 
     #[inline]
     /// Forward pass of the model for classification
+    ///
+    /// This function also calculates loss, use `.forward()` for inference
     pub fn forward_class(&self, item: TrainGptBatch<B>) -> ClassificationOutput<B> {
         let [batch_size, seq_len] = item.tokens_input.dims();
 
@@ -112,7 +133,7 @@ impl<B: Backend> Gpt<B> {
         let outputs = self.forward(batch);
         let targets_flat = item.targets.reshape([batch_size * seq_len]);
 
-        // Calculate cross entropy loss
+        // Calculate cross-entropy loss
         let loss = CrossEntropyLossConfig::new()
             .with_pad_tokens(Some(vec![self.pad_token]))
             .init(&outputs.device());

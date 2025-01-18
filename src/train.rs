@@ -23,6 +23,9 @@ use burn::{
 use log::{info, warn};
 use std::{path::PathBuf, sync::Arc};
 
+/// Configuration struct for training gpt model
+///
+/// Used by 'train' function
 #[derive(Config)]
 pub struct GPTtrainingConfig {
     /// Number of epochs (times to iterate over the whole dataset)
@@ -89,15 +92,18 @@ pub fn train<
     }
 
     // Initialize dataloaders
-    // train
+    // train dataloader...
     let dataloader_train: Arc<dyn DataLoader<TrainGptBatch<B>>> =
         DataLoaderBuilder::new(batcher_train)
             .batch_size(config.batch_size)
             .num_workers(config.num_workers)
             .shuffle(config.seed)
-            .build(SamplerDataset::new(dataset_train, config.elements_per_epoch));
+            .build(SamplerDataset::new(
+                dataset_train,
+                config.elements_per_epoch,
+            ));
 
-    // test
+    //  ... and test dataloader
     let dataloader_test = DataLoaderBuilder::new(batcher_test)
         .batch_size(config.batch_size)
         .num_workers(config.num_workers)
@@ -109,7 +115,7 @@ pub fn train<
 
     // optimizer initialization
     let optim = optimizer
-        .with_weight_decay(config.weight_decay as f32)
+        .with_weight_decay(config.weight_decay as f32) // with weight decay
         .init();
 
     // learning rate scheduler initialization
@@ -120,25 +126,32 @@ pub fn train<
         .with_model_size(gpt_config.transformer.d_model)
         .init();
 
+    // initialize learner and build it
     let learner = LearnerBuilder::new(artifact_dir)
+        // hardware metrics
         .metric_train(CudaMetric::new())
         .metric_valid(CudaMetric::new())
         .metric_train(CpuUse::new())
         .metric_train(CpuMemory::new())
         .metric_train(CpuTemperature::new())
+        // model stats metrics
         .metric_train_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_valid_numeric(AccuracyMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_train_numeric(LossMetric::new())
         .metric_valid_numeric(LossMetric::new())
         .metric_train_numeric(LearningRateMetric::new())
+        // file checkpointer
         .with_file_checkpointer(CompactRecorder::new())
+        // devices for training
         .devices(vec![device])
+        // gradient accumulation
         .grads_accumulation(accum)
+        // number of epochs
         .num_epochs(config.num_epochs)
+        // also summarize results after the training
         .summary()
+        // build learner
         .build(model, optim, lr_sched);
-
-    //thread::sleep(Duration::from_secs(5));
 
     // train the model
     let model = learner.fit(dataloader_train, dataloader_test);

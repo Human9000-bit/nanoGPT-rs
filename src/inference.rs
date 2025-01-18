@@ -12,11 +12,14 @@ use crate::{
     model::GptConfig,
 };
 
+/// Inference the model
+///
+/// Currently WIP
 pub fn infer<B: Backend>(
     model: GptConfig,
     device: B::Device,
     init_prompt: Option<String>,
-    artifact_dir: PathBuf
+    artifact_dir: PathBuf,
 ) {
     let tokenizer = Arc::new(GptTokenizer::default());
     let batcher = GptBatcher::new(tokenizer.clone(), model.max_seq_len);
@@ -28,21 +31,21 @@ pub fn infer<B: Backend>(
 
     let mut context = vec![TextGenerationItem::new(init_prompt)];
 
-        let sequence = model.forward(batcher.batch(context.clone()));
-        
-        let text = tokenizer.clone().decode(
-            sequence
-                .int()
-                .to_data()
-                .to_vec::<i32>()
-                .unwrap()
-                .par_iter()
-                .map(|i| *i as usize)
-                .collect::<Vec<usize>>()
-                .as_slice(),
-        );
-        
-        context.push(TextGenerationItem::new(text.clone()));
-        
-        print!("{}", text);
+    let sequence = model.forward(batcher.batch(context.clone()));
+
+    let text = tokenizer.clone().decode(
+        sequence
+            .int()
+            .to_data()
+            .to_vec::<i32>()
+            .unwrap()
+            .par_iter()
+            .map(|i| *i as usize)
+            .collect::<Vec<usize>>()
+            .as_slice(),
+    );
+
+    context.push(TextGenerationItem::new(text.clone()));
+
+    print!("{}", text);
 }

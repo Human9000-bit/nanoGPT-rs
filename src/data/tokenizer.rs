@@ -1,24 +1,44 @@
 use rayon::prelude::*;
 
+/// General trait for tokenizer
 pub trait Tokenizer: Send + Sync {
+    /// Encode a [&str] into Vec of indices
     fn encode(&self, value: &str, special_tokens: bool) -> Vec<usize>;
+
+    /// Decode a Vec of indices into [String]
     fn decode(&self, tokens: &[usize]) -> String;
+
+    /// Get a vocabulary size of tokens
     fn vocab_size(&self) -> usize;
+
+    /// Get the index of PAD token
     fn pad_token(&self) -> usize;
+
+    /// Get the index of START token
     fn start_token(&self) -> usize;
+
+    /// Get the index of END token
     fn end_token(&self) -> usize;
+
+    /// Decode the value of the PAD token
     fn pad_token_value(&self) -> String {
         self.decode(&[self.pad_token()])
     }
+
+    /// Decode the value of the START token
     fn start_token_value(&self) -> String {
         self.decode(&[self.start_token()])
     }
+
+    /// Decode the value of the END token
     fn end_token_value(&self) -> String {
         self.decode(&[self.end_token()])
     }
 }
 
+/// [crate::model::Gpt]'s tokenizer
 pub struct GptTokenizer {
+    /// Tokenizer for the model
     tokenizer: tokenizers::Tokenizer,
 }
 
@@ -42,11 +62,18 @@ impl Tokenizer for GptTokenizer {
         };
 
         let tokens = self.tokenizer.encode(text, true).unwrap();
-        tokens.get_ids().into_par_iter().map(|t| *t as usize).collect()
+        tokens
+            .get_ids()
+            .into_par_iter()
+            .map(|t| *t as usize)
+            .collect()
     }
 
     fn decode(&self, tokens: &[usize]) -> String {
-        let tokens = tokens.into_par_iter().map(|t| *t as u32).collect::<Vec<u32>>();
+        let tokens = tokens
+            .into_par_iter()
+            .map(|t| *t as u32)
+            .collect::<Vec<u32>>();
         self.tokenizer.decode(&tokens, false).unwrap()
     }
 
@@ -73,6 +100,8 @@ mod tests {
 
     use super::*;
 
+    /// Test that random string is the same as encoded and decoded back
+    // TODO: move to quickcheck crate
     #[test]
     fn test_encode_decode() {
         let tokenizer = GptTokenizer::default();

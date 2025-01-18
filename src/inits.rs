@@ -5,11 +5,14 @@ use crate::{
     model::GptConfig,
     train::GPTtrainingConfig,
 };
-
+/// Initialize gpt config from toml table
 pub fn init_gpt_config(
     config: &toml::map::Map<String, toml::Value>,
     vocab_size: usize,
 ) -> GptConfig {
+    // parse model configuration
+    //
+    // sorry for ugly code
     let d_model = config["n_embd"].as_integer().unwrap() as usize;
     let n_heads = config["n_head"].as_integer().unwrap() as usize;
     let n_layers = config["n_layer"].as_integer().unwrap() as usize;
@@ -20,12 +23,21 @@ pub fn init_gpt_config(
 
     let pad_token = GptTokenizer::default().pad_token();
 
-    let transf = TransformerEncoderConfig::new(d_model, d_model * d_ff_k, n_heads, n_layers);
-    GptConfig::new(transf, vocab_size, pad_token, max_seq_len, dropout, bias)
+    let transformer = TransformerEncoderConfig::new(d_model, d_model * d_ff_k, n_heads, n_layers);
+    GptConfig::new(
+        transformer,
+        vocab_size,
+        pad_token,
+        max_seq_len,
+        dropout,
+        bias,
+    )
 }
 
+/// Initialize gpt 's training config
 pub fn init_train_config(config: &toml::map::Map<String, toml::Value>) -> GPTtrainingConfig {
     let config: GPTtrainingConfig = toml::from_str(config.to_string().as_str()).unwrap();
+    // runtime check to make sure that target batch size if multiple of actual batch size
     assert!(
         config.target_batch_size % config.batch_size == 0
             && config.target_batch_size > config.batch_size

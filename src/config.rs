@@ -1,6 +1,7 @@
 use std::{fs::File, io::Read};
 use toml::Table;
 
+/// Parses config.toml into toml 's 'Table'
 pub fn parse_config() -> Table {
     let mut toml = String::new();
     File::open("config.toml")

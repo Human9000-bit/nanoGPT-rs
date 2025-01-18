@@ -63,7 +63,7 @@ fn main() -> Result<(), anyhow::Error> {
                 optimizer,
             );
         }
-        &_ => crate::inference::infer::<MyBackend>(
+        &_ => inference::infer::<MyBackend>(
             gpt_config,
             device,
             Some("primitive".into()),
