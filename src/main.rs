@@ -27,7 +27,7 @@ fn main() -> Result<(), anyhow::Error> {
     println!("{vocab_size}");
 
     // backend and autodiff types initialization
-    type MyBackend = Wgpu<f32, i32, backend::wgpu::WgslCompiler>;
+    type MyBackend = Wgpu<f32, i32, u8, backend::wgpu::WgslCompiler>;
 
     // device initialization
     let device = backend::wgpu::WgpuDevice::DefaultDevice;

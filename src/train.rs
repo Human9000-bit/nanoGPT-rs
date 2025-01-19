@@ -124,7 +124,8 @@ pub fn train<
     let lr_sched = NoamLrSchedulerConfig::new(config.learning_rate / accum as f64)
         .with_warmup_steps(config.warmup_steps)
         .with_model_size(gpt_config.transformer.d_model)
-        .init();
+        .init()
+        .unwrap();
 
     // initialize learner and build it
     let learner = LearnerBuilder::new(artifact_dir)

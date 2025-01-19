@@ -28,6 +28,11 @@ pub struct GptConfig {
     dropout: f64,
     /// Whether to use bias or not
     bias: bool,
+    /// Whether to use quiet softmax instead of the default one or not
+    ///
+    /// Quiet softmax described in Evan Miller's paper
+    /// [Attention is all by one](https://www.evanmiller.org/attention-is-off-by-one.html)
+    quiet_softmax: bool,
 }
 
 /// The GPT-2 - like model
@@ -64,6 +69,7 @@ impl GptConfig {
             .transformer
             .clone()
             .with_dropout(self.dropout)
+            .with_quiet_softmax(self.quiet_softmax)
             .init(device);
 
         // Initialize token embedding...

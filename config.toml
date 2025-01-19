@@ -9,6 +9,7 @@ bias = false
 dropout = 0.0
 n_layer = 12
 max_seq_len = 50
+quiet_attention = false
 
 # training config, changing these values will adjust the training process
 [train]

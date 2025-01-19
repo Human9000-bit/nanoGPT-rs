@@ -20,6 +20,7 @@ pub fn init_gpt_config(
     let dropout = config["dropout"].as_float().unwrap();
     let bias = config["bias"].as_bool().unwrap();
     let max_seq_len = config["max_seq_len"].as_integer().unwrap() as usize;
+    let quiet_softmax = config["quiet_attention"].as_bool().unwrap();
 
     let pad_token = GptTokenizer::default().pad_token();
 
@@ -31,6 +32,7 @@ pub fn init_gpt_config(
         max_seq_len,
         dropout,
         bias,
+        quiet_softmax
     )
 }
 
