@@ -25,6 +25,7 @@ log = "0.4.22"
 derive-new = "0.7.0"
 anyhow = "1.0.92"
 serde_json = "1.0.132"
+tiktoken-rs = "0.6.0"
 
 [dev-dependencies]
 quickcheck = "1.0.3"

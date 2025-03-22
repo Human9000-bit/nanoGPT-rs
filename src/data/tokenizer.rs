@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use tiktoken_rs::CoreBPE;
 
 /// General trait for tokenizer
 pub trait Tokenizer: Send + Sync {
@@ -91,6 +92,75 @@ impl Tokenizer for GptTokenizer {
 
     fn end_token(&self) -> usize {
         self.tokenizer.token_to_id("[END]").unwrap() as usize
+    }
+}
+
+pub struct TikTokenizer {
+    tokenizer: CoreBPE,
+}
+
+impl TikTokenizer {
+    pub fn new(tokenizer: CoreBPE) -> Self {
+        Self { tokenizer }
+    }
+}
+
+impl Default for TikTokenizer {
+    fn default() -> Self {
+        Self::new(tiktoken_rs::r50k_base().unwrap())
+    }
+}
+
+impl Tokenizer for TikTokenizer {
+    fn encode(&self, value: &str, special_tokens: bool) -> Vec<usize> {
+        match special_tokens {
+            true => self
+                .tokenizer
+                .encode_with_special_tokens(value)
+                .into_par_iter()
+                .map(|int| int as usize)
+                .collect(),
+            false => self
+                .tokenizer
+                .encode_ordinary(value)
+                .into_par_iter()
+                .map(|int| int as usize)
+                .collect(),
+        }
+    }
+    
+    fn decode(&self, tokens: &[usize]) -> String {
+        let tokens = tokens.into_par_iter().map(|int| *int as u32).collect::<Vec<u32>>();
+        self.tokenizer.decode(tokens).unwrap()
+    }
+    
+    fn start_token_value(&self) -> String {
+        todo!()
+    }
+    
+    fn start_token(&self) -> usize {
+        todo!()
+    }
+    
+    fn end_token(&self) -> usize {
+        todo!()
+    }
+    
+    fn end_token_value(&self) -> String {
+        todo!()
+    }
+    
+    fn pad_token_value(&self) -> String {
+        todo!()
+    }
+    
+    fn pad_token(&self) -> usize {
+        todo!()
+    }
+    
+    fn vocab_size(&self) -> usize {
+        // i found it in tiktoken source code
+        50256
     }
 }
 
