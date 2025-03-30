@@ -32,7 +32,7 @@ pub fn init_gpt_config(
         max_seq_len,
         dropout,
         bias,
-        quiet_softmax
+        quiet_softmax,
     )
 }
 
