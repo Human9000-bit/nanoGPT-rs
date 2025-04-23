@@ -26,6 +26,9 @@ derive-new = "0.7.0"
 anyhow = "1.0.92"
 serde_json = "1.0.132"
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.6.0", features = ["background_threads"] }
+
 [dev-dependencies]
 quickcheck = "1.0.3"
 
