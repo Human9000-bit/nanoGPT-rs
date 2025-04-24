@@ -93,7 +93,7 @@ pub fn train<
 
     // Initialize dataloaders
     // train dataloader...
-    let dataloader_train: Arc<dyn DataLoader<TrainGptBatch<B>>> =
+    let dataloader_train: Arc<dyn DataLoader<B, TrainGptBatch<B>>> =
         DataLoaderBuilder::new(batcher_train)
             .batch_size(config.batch_size)
             .num_workers(config.num_workers)

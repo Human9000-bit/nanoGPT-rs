@@ -10,7 +10,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 use std::path::Path;
 
 use burn::{
-    backend::{self, Autodiff, Wgpu},
+    backend::{self, Autodiff, Cuda},
     optim::AdamWConfig,
 };
 use data::DbPediaDataset;
@@ -34,10 +34,10 @@ fn main() -> Result<(), anyhow::Error> {
     println!("{vocab_size}");
 
     // backend and autodiff types initialization
-    type MyBackend = Wgpu<f32, i32, u8, backend::wgpu::WgslCompiler>;
+    type MyBackend = Cuda;
 
     // device initialization
-    let device = backend::wgpu::WgpuDevice::DefaultDevice;
+    let device = backend::cuda::CudaDevice::new(0);
 
     let config = config::parse_config(); //initialize model config from config.toml
 
