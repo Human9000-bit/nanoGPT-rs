@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 
+#![macro_use]
+extern crate log;
+extern crate pretty_env_logger;
+
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 
@@ -27,6 +31,8 @@ pub mod model;
 pub mod train;
 
 fn main() -> Result<(), anyhow::Error> {
+    pretty_env_logger::init();
+    
     let command = std::env::args().nth(1).unwrap();
     // load tokenizer and get vocabulary size
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
