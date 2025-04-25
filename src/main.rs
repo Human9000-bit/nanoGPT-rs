@@ -11,7 +11,7 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-use std::path::Path;
+use std::{error::Error, path::Path};
 
 use burn::{
     backend::{self, Autodiff, Cuda},
@@ -30,7 +30,7 @@ pub mod inits;
 pub mod model;
 pub mod train;
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
     
     let command = std::env::args().nth(1).unwrap();
