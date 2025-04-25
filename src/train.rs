@@ -1,5 +1,5 @@
 use crate::{
-    data::{GptBatcher, GptTokenizer, TextGenerationItem, Tokenizer, TrainGptBatch},
+    data::{GptBatcher, TikTokenizer, TextGenerationItem, Tokenizer, TrainGptBatch},
     model::GptConfig,
 };
 use burn::{
@@ -72,7 +72,7 @@ pub fn train<
     optimizer: AdamWConfig,
 ) {
     let artifact_dir = artifact_dir.as_path();
-    let tokenizer = Arc::new(GptTokenizer::default());
+    let tokenizer = Arc::new(TikTokenizer::default());
     let batcher_train = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
     let batcher_test = GptBatcher::new(tokenizer.clone(), gpt_config.max_seq_len);
 
