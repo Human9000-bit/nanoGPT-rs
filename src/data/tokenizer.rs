@@ -107,7 +107,7 @@ impl TikTokenizer {
 
 impl Default for TikTokenizer {
     fn default() -> Self {
-        Self::new(tiktoken_rs::r50k_base().unwrap())
+        Self::new(tiktoken_rs::cl100k_base().unwrap())
     }
 }
 
@@ -134,33 +134,33 @@ impl Tokenizer for TikTokenizer {
         self.tokenizer.decode(tokens).unwrap()
     }
     
-    fn start_token_value(&self) -> String {
-        todo!()
-    }
-    
     fn start_token(&self) -> usize {
         todo!()
     }
     
-    fn end_token(&self) -> usize {
+    fn start_token_value(&self) -> String {
         todo!()
+    }
+    
+    fn end_token(&self) -> usize {
+        100257
     }
     
     fn end_token_value(&self) -> String {
-        todo!()
-    }
-    
-    fn pad_token_value(&self) -> String {
-        todo!()
+        "<|endoftext|>".to_string()
     }
     
     fn pad_token(&self) -> usize {
-        todo!()
+        100256
+    }
+    
+    fn pad_token_value(&self) -> String {
+        "<|pad|>".to_string()
     }
     
     fn vocab_size(&self) -> usize {
         // i found it in tiktoken source code
-        50256
+        100277
     }
 }
 
@@ -171,8 +171,17 @@ mod tests {
 
     quickcheck! {
         /// Test that random string is the same as encoded and decoded back
-        fn test_encode_decode(text: String) -> bool {
+        fn test_encode_decode_gpt_tokenizer(text: String) -> bool {
             let tokenizer = GptTokenizer::default();
+
+            let encoded = tokenizer.encode(text.as_str(), false);
+            let decoded = tokenizer.decode(encoded.as_slice());
+
+            text == decoded
+        }
+        
+        fn test_encode_decode_tiktoken(text: String) -> bool {
+            let tokenizer = TikTokenizer::default();
 
             let encoded = tokenizer.encode(text.as_str(), false);
             let decoded = tokenizer.decode(encoded.as_slice());
