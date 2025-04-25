@@ -9,9 +9,9 @@ use super::{TextGenerationItem, Tokenizer};
 
 #[derive(Clone, new)]
 /// Batcher for the GPT model
-pub struct GptBatcher {
+pub struct GptBatcher<T: Tokenizer> {
     /// Batcher 's pointer to tokenizer
-    tokenizer: Arc<dyn Tokenizer>,
+    tokenizer: Arc<T>,
     /// Maximal sequence length of batch text
     max_seq_len: usize,
 }
@@ -36,7 +36,7 @@ pub struct TrainGptBatch<B: Backend> {
     pub targets: Tensor<B, 2, Int>,
 }
 
-impl<B: Backend> Batcher<B, TextGenerationItem, GptBatch<B>> for GptBatcher {
+impl<B: Backend, T: Tokenizer> Batcher<B, TextGenerationItem, GptBatch<B>> for GptBatcher<T> {
     fn batch(&self, items: Vec<TextGenerationItem>, device: &B::Device) -> GptBatch<B> {
         // encode the items in parallel
         let tokens_list = items
@@ -58,7 +58,7 @@ impl<B: Backend> Batcher<B, TextGenerationItem, GptBatch<B>> for GptBatcher {
     }
 }
 
-impl<B: Backend> Batcher<B, TextGenerationItem, TrainGptBatch<B>> for GptBatcher {
+impl<B: Backend, T: Tokenizer> Batcher<B, TextGenerationItem, TrainGptBatch<B>> for GptBatcher<T> {
     fn batch(&self, items: Vec<TextGenerationItem>, device: &B::Device) -> TrainGptBatch<B> {
         let item: GptBatch<B> = self.batch(items, device);
         let [batch_size, seq_length] = item.tokens.dims();
