@@ -1,9 +1,20 @@
 #![forbid(unsafe_code)]
 
-use std::path::Path;
+#![macro_use]
+extern crate log;
+extern crate pretty_env_logger;
+
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
+use std::{error::Error, path::Path};
 
 use burn::{
-    backend::{self, Autodiff, Wgpu},
+    backend::{self, Autodiff, Cuda},
     optim::AdamWConfig,
 };
 use data::DbPediaDataset;
@@ -19,7 +30,9 @@ pub mod inits;
 pub mod model;
 pub mod train;
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), Box<dyn Error>> {
+    pretty_env_logger::init();
+    
     let command = std::env::args().nth(1).unwrap();
     // load tokenizer and get vocabulary size
     let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
@@ -27,10 +40,10 @@ fn main() -> Result<(), anyhow::Error> {
     println!("{vocab_size}");
 
     // backend and autodiff types initialization
-    type MyBackend = Wgpu<f32, i32, u8, backend::wgpu::WgslCompiler>;
+    type MyBackend = Cuda;
 
     // device initialization
-    let device = backend::wgpu::WgpuDevice::DefaultDevice;
+    let device = backend::cuda::CudaDevice::new(0);
 
     let config = config::parse_config(); //initialize model config from config.toml
 

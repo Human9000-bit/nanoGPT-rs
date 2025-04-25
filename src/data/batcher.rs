@@ -36,8 +36,8 @@ pub struct TrainGptBatch<B: Backend> {
     pub targets: Tensor<B, 2, Int>,
 }
 
-impl<B: Backend> Batcher<TextGenerationItem, GptBatch<B>> for GptBatcher {
-    fn batch(&self, items: Vec<TextGenerationItem>) -> GptBatch<B> {
+impl<B: Backend> Batcher<B, TextGenerationItem, GptBatch<B>> for GptBatcher {
+    fn batch(&self, items: Vec<TextGenerationItem>, device: &B::Device) -> GptBatch<B> {
         // encode the items in parallel
         let tokens_list = items
             .into_par_iter()
@@ -48,7 +48,7 @@ impl<B: Backend> Batcher<TextGenerationItem, GptBatch<B>> for GptBatcher {
             self.tokenizer.pad_token(),
             tokens_list,
             Some(self.max_seq_len),
-            &B::Device::default(),
+            device,
         );
 
         GptBatch {
@@ -58,9 +58,9 @@ impl<B: Backend> Batcher<TextGenerationItem, GptBatch<B>> for GptBatcher {
     }
 }
 
-impl<B: Backend> Batcher<TextGenerationItem, TrainGptBatch<B>> for GptBatcher {
-    fn batch(&self, items: Vec<TextGenerationItem>) -> TrainGptBatch<B> {
-        let item: GptBatch<B> = self.batch(items);
+impl<B: Backend> Batcher<B, TextGenerationItem, TrainGptBatch<B>> for GptBatcher {
+    fn batch(&self, items: Vec<TextGenerationItem>, device: &B::Device) -> TrainGptBatch<B> {
+        let item: GptBatch<B> = self.batch(items, device);
         let [batch_size, seq_length] = item.tokens.dims();
 
         let inputs = item

@@ -31,7 +31,7 @@ pub fn infer<B: Backend>(
 
     let mut context = vec![TextGenerationItem::new(init_prompt)];
 
-    let sequence = model.forward(batcher.batch(context.clone()));
+    let sequence = model.forward(batcher.batch(context.clone(), &device));
 
     let text = tokenizer.clone().decode(
         sequence
