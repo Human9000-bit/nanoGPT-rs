@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 #![macro_use]
 extern crate log;
 extern crate pretty_env_logger;
@@ -17,6 +16,7 @@ use burn::{
     backend::{self, Autodiff, Cuda},
     optim::AdamWConfig,
 };
+use clap::{Parser, Subcommand};
 use data::DbPediaDataset;
 use inits::init_train_config;
 use log::info;
@@ -31,10 +31,30 @@ pub mod inits;
 pub mod model;
 pub mod train;
 
+#[derive(Parser)]
+#[clap(name = "nanogpt-rs")]
+#[clap(about = "A NanoGPT implementation in Rust using Burn")]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Train the model
+    Train,
+    /// Run inference with the model
+    Infer {
+        /// Optional prompt for inference
+        #[clap(short, long, default_value = "primitive")]
+        prompt: String,
+    },
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
-    
-    let command = std::env::args().nth(1).unwrap();
+
+    let cli = Cli::parse();
     // load tokenizer and get vocabulary size
     let vocab = TikTokenizer::default();
     let vocab_size = vocab.vocab_size();
@@ -53,8 +73,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let artifact_dir = Path::new("model/");
     let gpt_config = inits::init_gpt_config(config["model"].as_table().unwrap(), vocab_size);
 
-    match command.as_str() {
-        "train" => {
+    match cli.command {
+        Commands::Train => {
             let optimizer = AdamWConfig::new();
 
             // initialize datasets
@@ -77,12 +97,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 optimizer,
             );
         }
-        &_ => inference::infer::<MyBackend>(
-            gpt_config,
-            device,
-            Some("primitive".into()),
-            artifact_dir.to_path_buf(),
-        ),
+        Commands::Infer { prompt } => {
+            inference::infer::<MyBackend>(
+                gpt_config,
+                device,
+                Some(prompt),
+                artifact_dir.to_path_buf(),
+            );
+        }
     }
 
     Ok(())
