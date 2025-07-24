@@ -7,6 +7,7 @@ edition = "2021"
 burn = { version = "0.17.1", features = [
     "train",
     "cuda",
+    "wgpu",
     "accelerate",
     "autotune",
     "openblas-system",

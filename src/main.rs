@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![recursion_limit = "256"]
 #![macro_use]
 extern crate log;
 extern crate pretty_env_logger;
@@ -10,10 +11,10 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-use std::{error::Error, path::Path};
+use std::error::Error;
 
 use burn::{
-    backend::{self, Autodiff, Cuda},
+    backend::{self, Autodiff, Cuda, Wgpu},
     optim::AdamWConfig,
 };
 use clap::{Parser, Subcommand};
@@ -35,8 +36,19 @@ pub mod train;
 #[clap(name = "nanogpt-rs")]
 #[clap(about = "A NanoGPT implementation in Rust using Burn")]
 struct Cli {
+    /// Backend to use for computation
+    #[clap(short, long, default_value = "wgpu")]
+    backend: Backend,
     #[clap(subcommand)]
     command: Commands,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum Backend {
+    /// Use WGPU backend (default, cross-platform)
+    Wgpu,
+    /// Use CUDA backend (NVIDIA GPUs only)
+    Cuda,
 }
 
 #[derive(Subcommand)]
@@ -60,20 +72,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     let vocab_size = vocab.vocab_size();
     println!("{vocab_size}");
 
-    // backend and autodiff types initialization
-    type MyBackend = Cuda;
-
-    // device initialization
-    let device = backend::cuda::CudaDevice::new(0);
-
-    let config = config::parse_config(); //initialize model config from config.toml
-
+    let config = config::parse_config(); // initialize model config from config.toml
     info!("gpt config loaded");
 
-    let artifact_dir = Path::new("model/");
+    let artifact_dir = std::path::PathBuf::from("model/");
     let gpt_config = inits::init_gpt_config(config["model"].as_table().unwrap(), vocab_size);
 
-    match cli.command {
+    // backend and device initialization based on CLI argument
+    match cli.backend {
+        Backend::Cuda => run_with_cuda_backend(cli.command, gpt_config, artifact_dir, config),
+        Backend::Wgpu => run_with_wgpu_backend(cli.command, gpt_config, artifact_dir, config),
+    }
+
+    Ok(())
+}
+
+fn run_with_cuda_backend(
+    command: Commands,
+    gpt_config: crate::model::GptConfig,
+    artifact_dir: std::path::PathBuf,
+    config: toml::Table,
+) {
+    type MyBackend = Cuda;
+    let device = backend::cuda::CudaDevice::new(0);
+
+    match command {
         Commands::Train => {
             let optimizer = AdamWConfig::new();
 
@@ -85,27 +108,57 @@ fn main() -> Result<(), Box<dyn Error>> {
             let train_config = init_train_config(config["train"].as_table().unwrap());
 
             // train the model
-            // TODO: add choice between train and inference modes
             type AutoDiff = Autodiff<MyBackend>;
             train::<AutoDiff, DbPediaDataset, DbPediaDataset>(
                 device,
                 dataset_train,
                 dataset_test,
                 train_config,
-                artifact_dir.to_path_buf(),
+                artifact_dir,
                 gpt_config,
                 optimizer,
             );
         }
         Commands::Infer { prompt } => {
-            inference::infer::<MyBackend>(
-                gpt_config,
-                device,
-                Some(prompt),
-                artifact_dir.to_path_buf(),
-            );
+            inference::infer::<MyBackend>(gpt_config, device, Some(prompt), artifact_dir);
         }
     }
+}
 
-    Ok(())
+fn run_with_wgpu_backend(
+    command: Commands,
+    gpt_config: crate::model::GptConfig,
+    artifact_dir: std::path::PathBuf,
+    config: toml::Table,
+) {
+    type MyBackend = Wgpu;
+    let device = burn::backend::wgpu::WgpuDevice::default();
+
+    match command {
+        Commands::Train => {
+            let optimizer = AdamWConfig::new();
+
+            // initialize datasets
+            let dataset_train = DbPediaDataset::train();
+            let dataset_test = DbPediaDataset::test();
+
+            // configs initialization
+            let train_config = init_train_config(config["train"].as_table().unwrap());
+
+            // train the model
+            type AutoDiff = Autodiff<MyBackend>;
+            train::<AutoDiff, DbPediaDataset, DbPediaDataset>(
+                device,
+                dataset_train,
+                dataset_test,
+                train_config,
+                artifact_dir,
+                gpt_config,
+                optimizer,
+            );
+        }
+        Commands::Infer { prompt } => {
+            inference::infer::<MyBackend>(gpt_config, device, Some(prompt), artifact_dir);
+        }
+    }
 }
