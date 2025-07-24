@@ -1,15 +1,11 @@
 use burn::{
+    nn::transformer::{TransformerDecoder, TransformerDecoderConfig, TransformerDecoderInput},
     prelude::*,
     tensor::backend::AutodiffBackend,
     train::{ClassificationOutput, TrainOutput, TrainStep, ValidStep},
 };
 use core::f64;
-use nn::{
-    attention::generate_autoregressive_mask,
-    loss::CrossEntropyLossConfig,
-    transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput},
-    Embedding, EmbeddingConfig, Linear, LinearConfig,
-};
+use nn::{loss::CrossEntropyLossConfig, Embedding, EmbeddingConfig, Linear, LinearConfig};
 
 use crate::data::{GptBatch, TrainGptBatch};
 
@@ -17,7 +13,7 @@ use crate::data::{GptBatch, TrainGptBatch};
 /// Gpt configuration struct
 pub struct GptConfig {
     /// Transformer encoder config
-    pub transformer: TransformerEncoderConfig,
+    pub transformer: TransformerDecoderConfig,
     /// Vocabulary size from tokenizer
     pub vocab_size: usize,
     /// Padding token from tokenizer
@@ -39,7 +35,7 @@ pub struct GptConfig {
 #[derive(Module, Debug)]
 pub struct Gpt<B: Backend> {
     /// Model transformer
-    transformer: TransformerEncoder<B>,
+    transformer: TransformerDecoder<B>,
     /// Embedding token encoding
     embd_token: Embedding<B>,
     /// Embedding positional encoding
@@ -101,7 +97,6 @@ impl<B: Backend> Gpt<B> {
 
         // move data to device
         let inputs = batch.tokens.to_device(device);
-        let mask = batch.mask_pad.to_device(device);
 
         let idx_pos: Tensor<B, 2, Int> = Tensor::arange(0..(seq_len as i64), device)
             .reshape([1, seq_len])
@@ -112,14 +107,14 @@ impl<B: Backend> Gpt<B> {
         let embd_tokens = self.embd_token.forward(inputs);
         let embedding = (embd_pos + embd_tokens) / 2;
 
-        let mask_attn = generate_autoregressive_mask::<B>(batch_size, seq_len, device);
+        // Get embedding shape before the move
+        let embedding_shape = embedding.shape();
 
         // the forward pass of the transformer
-        let encoded = self.transformer.forward(
-            TransformerEncoderInput::new(embedding)
-                .mask_pad(mask)
-                .mask_attn(mask_attn),
-        );
+        let encoded = self.transformer.forward(TransformerDecoderInput::new(
+            embedding,
+            Tensor::zeros(embedding_shape, device),
+        ));
 
         // pass the output through the linear layer
         let output = self.linear.forward(encoded);

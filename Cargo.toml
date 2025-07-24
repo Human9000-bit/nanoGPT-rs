@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-burn = { version = "0.17.0", features = [
+burn = { version = "0.17.1", features = [
     "train",
     "cuda",
     "accelerate",
@@ -14,7 +14,6 @@ burn = { version = "0.17.0", features = [
     "fusion",
     "sqlite",
 ] }
-tokenizers = { version = "0.21.1", features = ["hf-hub", "http"] }
 rayon = "1.10.0"
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.20"

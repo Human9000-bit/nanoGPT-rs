@@ -8,7 +8,7 @@ use burn::prelude::Backend;
 
 use crate::data::Tokenizer;
 use crate::{
-    data::{GptBatcher, GptTokenizer, TextGenerationItem},
+    data::{GptBatcher, TikTokenizer, TextGenerationItem},
     model::GptConfig,
 };
 
@@ -21,7 +21,7 @@ pub fn infer<B: Backend>(
     init_prompt: Option<String>,
     artifact_dir: PathBuf,
 ) {
-    let tokenizer = Arc::new(GptTokenizer::default());
+    let tokenizer = Arc::new(TikTokenizer::default());
     let batcher = GptBatcher::new(tokenizer.clone(), model.max_seq_len);
     let init_prompt = init_prompt.unwrap_or_default();
     let model = model
@@ -47,5 +47,5 @@ pub fn infer<B: Backend>(
 
     context.push(TextGenerationItem::new(text.clone()));
 
-    print!("{}", text);
+    print!("{text}");
 }

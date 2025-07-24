@@ -1,7 +1,7 @@
-use burn::nn::transformer::TransformerEncoderConfig;
+use burn::nn::transformer::TransformerDecoderConfig;
 
 use crate::{
-    data::{GptTokenizer, Tokenizer},
+    data::{TikTokenizer, Tokenizer},
     model::GptConfig,
     train::GPTtrainingConfig,
 };
@@ -22,9 +22,9 @@ pub fn init_gpt_config(
     let max_seq_len = config["max_seq_len"].as_integer().unwrap() as usize;
     let quiet_softmax = config["quiet_attention"].as_bool().unwrap();
 
-    let pad_token = GptTokenizer::default().pad_token();
+    let pad_token = TikTokenizer::default().pad_token();
 
-    let transformer = TransformerEncoderConfig::new(d_model, d_model * d_ff_k, n_heads, n_layers);
+    let transformer = TransformerDecoderConfig::new(d_model, d_model * d_ff_k, n_heads, n_layers);
     GptConfig::new(
         transformer,
         vocab_size,

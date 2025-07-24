@@ -20,8 +20,9 @@ use burn::{
 use data::DbPediaDataset;
 use inits::init_train_config;
 use log::info;
-use tokenizers::Tokenizer;
 use train::train;
+
+use crate::data::{TikTokenizer, Tokenizer};
 
 pub mod config;
 pub mod data;
@@ -35,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let command = std::env::args().nth(1).unwrap();
     // load tokenizer and get vocabulary size
-    let vocab = Tokenizer::from_pretrained("gpt2", None).unwrap();
-    let vocab_size = vocab.get_vocab_size(false);
+    let vocab = TikTokenizer::default();
+    let vocab_size = vocab.vocab_size();
     println!("{vocab_size}");
 
     // backend and autodiff types initialization
